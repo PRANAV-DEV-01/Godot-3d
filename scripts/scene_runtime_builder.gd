@@ -36,20 +36,20 @@ func _build() -> void:
 	var mat_ledge := _make_ledge_mat()
 
 	# ── Floor ───────────────────────────────────────────────────
-	_add_box(room, Vector3(20, 0.4, 20), Vector3.ZERO, mat_floor, "Floor")
+	_add_box(room, Vector3(20, 0.4, 20), Vector3.ZERO, mat_floor, "Floor", 1, "concrete")
 	# ── Perimeter walls ─────────────────────────────────────────
-	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, -9.8), mat_pw, "WallNorth")
-	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, 9.8), mat_pw, "WallSouth")
-	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(9.8, 3, 0), mat_pw, "WallEast")
-	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(-9.8, 3, 0), mat_pw, "WallWest")
+	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, -9.8), mat_pw, "WallNorth", 1, "concrete")
+	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, 9.8), mat_pw, "WallSouth", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(9.8, 3, 0), mat_pw, "WallEast", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(-9.8, 3, 0), mat_pw, "WallWest", 1, "concrete")
 	# ── Wall-run walls ──────────────────────────────────────────
-	_add_box(room, Vector3(0.4, 6, 10), Vector3(-2, 3, -2), mat_wr1, "WallRunLeft", 2)
-	_add_box(room, Vector3(0.4, 6, 10), Vector3(2, 3, -2), mat_wr2, "WallRunRight", 2)
+	_add_box(room, Vector3(0.4, 6, 10), Vector3(-2, 3, -2), mat_wr1, "WallRunLeft", 2, "metal")
+	_add_box(room, Vector3(0.4, 6, 10), Vector3(2, 3, -2), mat_wr2, "WallRunRight", 2, "metal")
 	# ── Platform ────────────────────────────────────────────────
-	_add_box(room, Vector3(4, 2, 4), Vector3(-6, 1, -6), mat_plat, "Platform")
+	_add_box(room, Vector3(4, 2, 4), Vector3(-6, 1, -6), mat_plat, "Platform", 1, "metal")
 	# ── Ledge ───────────────────────────────────────────────────
-	_add_box(room, Vector3(5, 1.0, 2), Vector3(6, 0.5, -4), mat_ledge, "LedgeBlock")
-	_add_box(room, Vector3(5, 0.4, 8), Vector3(6, 1.2, -4), mat_ledge, "LedgeTop")
+	_add_box(room, Vector3(5, 1.0, 2), Vector3(6, 0.5, -4), mat_ledge, "LedgeBlock", 1, "concrete")
+	_add_box(room, Vector3(5, 0.4, 8), Vector3(6, 1.2, -4), mat_ledge, "LedgeTop", 1, "concrete")
 
 	# ── Lighting ────────────────────────────────────────────────
 	_build_lighting(root)
@@ -181,6 +181,7 @@ void fragment() {
 	ROUGHNESS = clamp(r, 0.0, 1.0);
 	METALLIC = metallic;
 	AO = 1.0 - n * 0.3;
+}
 """
 	return s
 
@@ -221,6 +222,7 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = roughness + n * 0.2;
 	METALLIC = metallic;
+}
 """
 	return s
 
@@ -258,6 +260,7 @@ void fragment() {
 	ALBEDO = col * (1.0 + n - 0.03);
 	ROUGHNESS = roughness + n * 0.15;
 	METALLIC = metallic;
+}
 """
 	return s
 
@@ -267,12 +270,13 @@ void fragment() {
 # ══════════════════════════════════════════════════════════════════════
 
 func _add_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material,
-		box_name: String, layer := 1) -> void:
+		box_name: String, layer := 1, surface := "concrete") -> void:
 	var body := StaticBody3D.new()
 	body.name = box_name
 	body.position = pos
 	body.collision_layer = layer
 	body.collision_mask = 1
+	body.set_meta("surface_type", surface)
 	parent.add_child(body)
 	body.owner = parent.owner
 
@@ -293,12 +297,13 @@ func _add_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material,
 
 
 func _add_box_rot_y(parent: Node3D, size: Vector3, pos: Vector3, mat: Material,
-		box_name: String, layer := 1) -> void:
+		box_name: String, layer := 1, surface := "concrete") -> void:
 	var body := StaticBody3D.new()
 	body.name = box_name
 	body.position = pos
 	body.collision_layer = layer
 	body.collision_mask = 1
+	body.set_meta("surface_type", surface)
 	parent.add_child(body)
 	body.owner = parent.owner
 
@@ -377,7 +382,7 @@ func _add_spot(parent: Node3D, pos: Vector3, rot: Vector3, range_: float,
 	spot.light_energy = energy
 	spot.spot_range = range_
 	spot.spot_angle = 45.0
-	spot.omni_attenuation = 1.5
+	spot.spot_attenuation = 1.5
 	parent.add_child(spot)
 	spot.owner = parent.owner
 
@@ -420,7 +425,7 @@ func _build_particles(root: Node3D) -> void:
 	dust_mat.scale_min = 0.015
 	dust_mat.scale_max = 0.04
 	dust_mat.color = Color(0.9, 0.88, 0.8)
-	dust_mat.color_ramp = _make_fade_ramp()
+	dust_mat.color_ramp = _make_gradient_tex(_make_fade_ramp())
 	dust.process_material = dust_mat
 	dust.draw_pass_1 = _make_dust_billboard()
 	root.add_child(dust)
@@ -443,7 +448,7 @@ func _build_particles(root: Node3D) -> void:
 	spark_mat.scale_min = 0.02
 	spark_mat.scale_max = 0.06
 	spark_mat.color = Color(1.0, 0.8, 0.3)
-	spark_mat.color_ramp = _make_spark_ramp()
+	spark_mat.color_ramp = _make_gradient_tex(_make_spark_ramp())
 	sparks.process_material = spark_mat
 	sparks.draw_pass_1 = _make_dust_billboard()
 	player.add_child(sparks)
@@ -469,7 +474,7 @@ func _build_particles(root: Node3D) -> void:
 	puff_mat.damping_min = 3.0
 	puff_mat.damping_max = 6.0
 	puff_mat.color = Color(0.7, 0.68, 0.62)
-	puff_mat.color_ramp = _make_fade_ramp()
+	puff_mat.color_ramp = _make_gradient_tex(_make_fade_ramp())
 	puff.process_material = puff_mat
 	puff.draw_pass_1 = _make_dust_billboard()
 	player.add_child(puff)
@@ -493,7 +498,7 @@ func _build_particles(root: Node3D) -> void:
 	sdust_mat.scale_min = 0.05
 	sdust_mat.scale_max = 0.12
 	sdust_mat.color = Color(0.65, 0.63, 0.58)
-	sdust_mat.color_ramp = _make_fade_ramp()
+	sdust_mat.color_ramp = _make_gradient_tex(_make_fade_ramp())
 	sdust.process_material = sdust_mat
 	sdust.draw_pass_1 = _make_dust_billboard()
 	player.add_child(sdust)
@@ -517,7 +522,7 @@ func _build_particles(root: Node3D) -> void:
 	dash_mat.scale_min = 0.04
 	dash_mat.scale_max = 0.1
 	dash_mat.color = Color(0.7, 0.8, 1.0)
-	dash_mat.color_ramp = _make_dash_ramp()
+	dash_mat.color_ramp = _make_gradient_tex(_make_dash_ramp())
 	dash.process_material = dash_mat
 	dash.draw_pass_1 = _make_dust_billboard()
 	player.add_child(dash)
@@ -560,8 +565,14 @@ func _make_dust_billboard() -> QuadMesh:
 	mat.billboard_keep_scale = true
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(1, 1, 1, 0.5)
-	q.surface_add_material(mat)
+	q.surface_set_material(0, mat)
 	return q
+
+
+func _make_gradient_tex(g: Gradient) -> GradientTexture1D:
+	var tex := GradientTexture1D.new()
+	tex.gradient = g
+	return tex
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -695,7 +706,7 @@ func _rebuild_env(root: Node3D) -> void:
 	env.ambient_light_energy = 0.4
 
 	# Tonemap
-	env.tonemap_mode = Environment.TONE_MAP_ACES
+	env.tonemap_mode = 3  # TONE_MAP_ACES
 	env.tonemap_white = 6.0
 
 	# Glow / bloom
@@ -719,9 +730,9 @@ func _rebuild_env(root: Node3D) -> void:
 	env.volumetric_fog_enabled = true
 	env.volumetric_fog_density = 0.02
 	env.volumetric_fog_albedo = Color(0.8, 0.82, 0.85)
-	env.volumetric_fog_emission = Color(0.0)
+	env.volumetric_fog_emission = Color(0.0, 0.0, 0.0)
 	env.volumetric_fog_length = 30.0
-	env.volumetric_fog_inscattering_strength = 0.3
+	env.volumetric_fog_gi_inject = 0.3
 
 	var world_env := WorldEnvironment.new()
 	world_env.name = "WorldEnvironment"

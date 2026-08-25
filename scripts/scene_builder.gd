@@ -762,7 +762,7 @@ func _rebuild_env(root: Node3D) -> void:
 	env.volumetric_fog_enabled = true
 	env.volumetric_fog_density = 0.02
 	env.volumetric_fog_albedo = Color(0.8, 0.82, 0.85)
-	env.volumetric_fog_emission = Color(0.0)
+	env.volumetric_fog_emission = Color(0.0, 0.0, 0.0)
 	env.volumetric_fog_length = 30.0
 	env.volumetric_fog_inscattering_strength = 0.3
 
