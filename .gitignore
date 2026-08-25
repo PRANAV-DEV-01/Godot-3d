@@ -1,0 +1,33 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+*.translation
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Tool caches
+.npm/
+.cache/
+.local/
+.config/
+
+# ParkourMesh (separate project)
+ParkourMesh-project/
+parkourmesh-build/
+parkour-mesh-build/
+parkourmesh-repo/
+Parkour Mesh.zip
+ParkourMesh.zip
+
+# Temp / one-shot scripts
+scripts/capture_main.gd
+scripts/cli_screenshots.gd
+
+# Binary
+/tmp/

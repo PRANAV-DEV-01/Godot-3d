@@ -1,0 +1,225 @@
+[gd_scene load_steps=21 format=3]
+
+[ext_resource type="Script" path="res://scripts/debug_hud.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(20, 0.4, 20)
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(20, 0.4, 20)
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.72, 0.72, 0.72, 1)
+roughness = 0.9
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_perim"]
+size = Vector3(20, 6, 0.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_perim"]
+size = Vector3(20, 6, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_perim"]
+albedo_color = Color(0.55, 0.58, 0.62, 1)
+roughness = 0.85
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_perim_side"]
+size = Vector3(0.4, 6, 20)
+
+[sub_resource type="BoxMesh" id="BoxMesh_perim_side"]
+size = Vector3(0.4, 6, 20)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wr"]
+size = Vector3(0.4, 6, 10)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wr"]
+size = Vector3(0.4, 6, 10)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wr1"]
+albedo_color = Color(0.42, 0.72, 0.48, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Mat_wr2"]
+albedo_color = Color(0.48, 0.78, 0.52, 1)
+roughness = 0.7
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_plat"]
+size = Vector3(4, 2, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plat"]
+size = Vector3(4, 2, 4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_plat"]
+albedo_color = Color(0.85, 0.65, 0.30, 1)
+roughness = 0.8
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ledge"]
+size = Vector3(5, 0.4, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ledge"]
+size = Vector3(5, 0.4, 8)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ledge"]
+albedo_color = Color(0.65, 0.60, 0.50, 1)
+roughness = 0.9
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ledge_ramp"]
+size = Vector3(5, 1.0, 2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ledge_ramp"]
+size = Vector3(5, 1.0, 2)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ledge_ramp"]
+albedo_color = Color(0.62, 0.58, 0.48, 1)
+roughness = 0.9
+
+[sub_resource type="ProceduralSkyMaterial" id="ProcedSkyMat"]
+sky_top_color = Color(0.35, 0.50, 0.70, 1)
+sky_horizon_color = Color(0.65, 0.72, 0.80, 1)
+ground_bottom_color = Color(0.20, 0.17, 0.13, 1)
+ground_horizon_color = Color(0.60, 0.58, 0.55, 1)
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ProcedSkyMat")
+
+[sub_resource type="Environment" id="Env_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.55, 0.6, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.7, 0.75, 0.8, 1)
+fog_density = 0.005
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 10, 15, 10)
+light_energy = 1.2
+light_color = Color(1, 0.98, 0.92, 1)
+shadow_enabled = true
+directional_shadow_max_distance = 50.0
+
+[node name="Room" type="Node3D" parent="."]
+
+[node name="Floor" type="StaticBody3D" parent="Room"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/Floor"]
+shape = SubResource("BoxShape3D_floor")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/Floor"]
+mesh = SubResource("BoxMesh_floor")
+surface_material_override/0 = SubResource("Mat_floor")
+
+[node name="WallNorth" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -9.8)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallNorth"]
+shape = SubResource("BoxShape3D_perim")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallNorth"]
+mesh = SubResource("BoxMesh_perim")
+surface_material_override/0 = SubResource("Mat_perim")
+
+[node name="WallSouth" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 9.8)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallSouth"]
+shape = SubResource("BoxShape3D_perim")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallSouth"]
+mesh = SubResource("BoxMesh_perim")
+surface_material_override/0 = SubResource("Mat_perim")
+
+[node name="WallEast" type="StaticBody3D" parent="Room"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.8, 3, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallEast"]
+shape = SubResource("BoxShape3D_perim_side")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallEast"]
+mesh = SubResource("BoxMesh_perim_side")
+surface_material_override/0 = SubResource("Mat_perim")
+
+[node name="WallWest" type="StaticBody3D" parent="Room"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -9.8, 3, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallWest"]
+shape = SubResource("BoxShape3D_perim_side")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallWest"]
+mesh = SubResource("BoxMesh_perim_side")
+surface_material_override/0 = SubResource("Mat_perim")
+
+[node name="WallRunLeft" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 3, -2)
+collision_layer = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallRunLeft"]
+shape = SubResource("BoxShape3D_wr")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallRunLeft"]
+mesh = SubResource("BoxMesh_wr")
+surface_material_override/0 = SubResource("Mat_wr1")
+
+[node name="WallRunRight" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, -2)
+collision_layer = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/WallRunRight"]
+shape = SubResource("BoxShape3D_wr")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/WallRunRight"]
+mesh = SubResource("BoxMesh_wr")
+surface_material_override/0 = SubResource("Mat_wr2")
+
+[node name="Platform" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/Platform"]
+shape = SubResource("BoxShape3D_plat")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/Platform"]
+mesh = SubResource("BoxMesh_plat")
+surface_material_override/0 = SubResource("Mat_plat")
+
+[node name="LedgeBlock" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.5, -4)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/LedgeBlock"]
+shape = SubResource("BoxShape3D_ledge_ramp")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/LedgeBlock"]
+mesh = SubResource("BoxMesh_ledge_ramp")
+surface_material_override/0 = SubResource("Mat_ledge_ramp")
+
+[node name="LedgeTop" type="StaticBody3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.2, -4)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Room/LedgeTop"]
+shape = SubResource("BoxShape3D_ledge")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Room/LedgeTop"]
+mesh = SubResource("BoxMesh_ledge")
+surface_material_override/0 = SubResource("Mat_ledge")
+
+[node name="Player" parent="." instance=ExtResource("3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 6)
+
+[node name="DebugHUD" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("1")
+
+[node name="Label" type="Label" parent="DebugHUD"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 340.0
+offset_bottom = 160.0
+theme_override_colors/font_color = Color(0, 0, 0, 0.85)
+theme_override_font_sizes/font_size = 15
+text = "Loading..."
