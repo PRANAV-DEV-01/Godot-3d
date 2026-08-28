@@ -86,6 +86,19 @@ func _process(_delta: float) -> bool:
 			if wait_frames >= wait_target:
 				_debug_cam("before-wallrun")
 				_capture_or_report("03_wallrun_approach", Vector3(0, 2.0, 4), Vector3(0, 2.0, -6))
+				phase = 40
+
+		40:  # View 4: worst-case grazing angle, standing in the corridor looking down its length
+			_pose(Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
+			wait_frames = 0
+			wait_target = 20
+			phase = 41
+
+		41:
+			wait_frames += 1
+			if wait_frames >= wait_target:
+				_debug_cam("before-corridor")
+				_capture_or_report("04_corridor_down_length", Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
 				print("[Capture] All captures done.")
 				quit()
 				return true

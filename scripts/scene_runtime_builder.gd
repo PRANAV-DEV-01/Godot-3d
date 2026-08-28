@@ -216,15 +216,17 @@ float noise(vec2 p) {
 
 void fragment() {
 	vec2 uv = UV;
-	float stripe = smoothstep(0.45, 0.5, fract(uv.y * stripe_freq));
-	vec3 col = mix(base_color, accent_color, stripe * 0.7);
-	float line = smoothstep(0.86, 0.98, fract(uv.x * 3.0));
-	col = mix(col, base_color * 0.55, line * 0.55);
-	float edge = smoothstep(0.02, 0.0, uv.x) + smoothstep(0.98, 1.0, uv.x);
-	edge += smoothstep(0.02, 0.0, uv.y) + smoothstep(0.98, 1.0, uv.y);
-	col *= 0.85 + 0.15 * (1.0 - min(edge, 1.0));
-	float n = noise(uv * 20.0) * 0.08;
-	col *= 1.0 + n - 0.04;
+	vec3 col = base_color;
+	// stripes vary along the wall's HEIGHT axis only (local Y), so the band
+	// edges run across the wall face, not along its length (depth) axis —
+	// thin crisp lines keep the pattern reading as parallel lines receding
+	// into depth instead of a converging slab-fan.
+	float stripe = smoothstep(0.70, 0.80, fract(VERTEX.y * stripe_freq));
+	col = mix(col, accent_color, stripe * 0.9);
+	float edge = smoothstep(0.02, 0.0, uv.y) + smoothstep(0.98, 1.0, uv.y);
+	col *= 0.9 + 0.1 * (1.0 - min(edge, 1.0));
+	float n = noise(uv * 20.0) * 0.05;
+	col *= 1.0 + n;
 	ALBEDO = col;
 	ROUGHNESS = roughness + n * 0.2;
 	METALLIC = metallic;

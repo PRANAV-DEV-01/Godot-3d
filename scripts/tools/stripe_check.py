@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Stripe-density verification for the green wallrun walls.
+"""Striped-wall orientation + density verification.
 
-Counts how many distinct stripe-width transitions occur across the striped wall
-surface in a verification screenshot:
+Counts distinct stripe-width transitions across the striped wall surface by
+detecting the green stripe LINES along a strip down the wall:
 
-  - green mask sampled every 2 px: g > r+25 and g > b+10
-  - the 12 columns with the most green pixels are taken as the near/visible
-    wall face; for each, transitions are counted across its green vertical
-    span (that strip crosses the horizontal caution stripes)
-  - reported: median and max transition count, plus implied stripe-band count
-    (transitions / 2)
-
-A second mode (--ab) counts the same metric on the controlled close-up pair
-(same camera, stripe_freq 12 vs 34).
+  - near-wall columns are chosen as the columns with the most strong-green
+    samples (g > r+25 and g > b+10) OR the most green-channel local maxima
+  - for each chosen column, stripe lines are detected as local maxima of the
+    green channel along y (peaks separated by >= MIN_SEP samples, prominence
+    >= PROMINENCE above the surrounding troughs), which survives antialiasing
+    of thin stripes at distance
+  - the number of stripe lines crossed by the strip = distinct stripe-width
+    transitions (each line has an entering and leaving edge)
+  - reported: median and max line counts across the chosen columns
 
 Usage:
   python3 scripts/tools/stripe_check.py <before_dir> <after_dir>
@@ -26,7 +26,46 @@ from PIL import Image
 
 STEP = 2
 THR = 25
+PROMINENCE = 18
+MIN_SEP = 5
 N_COLS = 12
+
+
+def green_samples(px, x, y0, y1):
+    out = []
+    for y in range(y0, y1):
+        r, g, b = px[x * STEP, y * STEP]
+        out.append(g if (g > r + THR and g > b + 10) else 0)
+    return out
+
+
+def count_peaks(vals):
+    """Count stripe lines = local maxima of the green channel.
+
+    A peak is a sample that is the max of its +-2 window, is >= PROMINENCE
+    above the min in its +-6 window (so troughs are dark), and is separated
+    from the previous peak by >= MIN_SEP samples.
+    """
+    n = len(vals)
+    peaks = 0
+    last = -1
+    for i in range(n):
+        if vals[i] == 0:
+            continue
+        lo = max(0, i - 2)
+        hi = min(n, i + 3)
+        if vals[i] != max(vals[lo:hi]):
+            continue
+        wlo = max(0, i - 6)
+        whi = min(n, i + 7)
+        if vals[i] - min(vals[wlo:whi]) < PROMINENCE:
+            continue
+        if last >= 0 and i - last < MIN_SEP:
+            last = i
+            continue
+        peaks += 1
+        last = i
+    return peaks
 
 
 def near_wall_metric(path):
@@ -35,50 +74,51 @@ def near_wall_metric(path):
     px = im.load()
     wl = w // STEP
     hl = h // STEP
-    m = []
+    scores = []
     for x in range(wl):
-        col = []
+        y0 = 0
+        y1 = hl
+        # roughly limit to the column's likely wall span later; for now full column
+        g = px[x * STEP, hl // 2]
+        r = g[0]
+        base = g[1]
+        strong = 0
         for y in range(hl):
-            r, g, b = px[x * STEP, y * STEP]
-            col.append(1 if (g > r + THR and g > b + 10) else 0)
-        m.append(col)
-    totals = [sum(c) for c in m]
-    best_cols = sorted(range(wl), key=lambda x: -totals[x])[:N_COLS]
-    trans = []
+            rr, gg, bb = px[x * STEP, y * STEP]
+            if gg > rr + THR and gg > bb + 10:
+                strong += 1
+        scores.append(strong)
+    best_cols = sorted(range(wl), key=lambda x: -scores[x])[:N_COLS]
+    counts = []
     for x in best_cols:
-        col = m[x]
-        ys = [y for y in range(hl) if col[y]]
-        if not ys:
-            continue
-        sub = col[min(ys):max(ys) + 1]
-        t = 0
-        prev = 0
-        for v in sub:
-            if v != prev:
-                t += 1
-            prev = v
-        trans.append(t)
-    if not trans:
+        vals = green_samples(px, x, 0, hl)
+        c = count_peaks(vals)
+        counts.append(c)
+    if not counts:
         return (0, 0)
-    med = statistics.median(trans)
-    return (int(med), (int(med) + 1) // 2)
+    med = statistics.median(counts)
+    return (int(med), int(max(counts)))
 
 
 def main():
-    shots = ["01_spawn_facing_room", "02_platform_looking_back", "03_wallrun_approach"]
+    shots = ["01_spawn_facing_room", "02_platform_looking_back", "03_wallrun_approach", "04_corridor_down_length"]
     if sys.argv[1] == "--ab":
         a = near_wall_metric(sys.argv[2])
         b = near_wall_metric(sys.argv[3])
-        print("close-up A/B (transitions, stripe-bands):")
+        print("close-up A/B (median stripe-lines, max):")
         print("  freq12 (before):  %d / %d" % (a[0], a[1]))
         print("  freq34 (fixed):   %d / %d" % (b[0], b[1]))
         return
     before_dir, after_dir = sys.argv[1], sys.argv[2]
-    print("%-24s %-20s %s" % ("screenshot", "BEFORE trans/bands", "AFTER trans/bands"))
+    print("%-26s %-22s %s" % ("screenshot", "BEFORE lines(med/max)", "AFTER lines(med/max)"))
     for shot in shots:
-        b = near_wall_metric(os.path.join(before_dir, shot + ".png"))
+        bpath = os.path.join(before_dir, shot + ".png")
         a = near_wall_metric(os.path.join(after_dir, shot + ".png"))
-        print("%-24s %10d / %-5d %10d / %d" % (shot, b[0], b[1], a[0], a[1]))
+        if os.path.exists(bpath):
+            b = near_wall_metric(bpath)
+            print("%-26s %11d / %-5d %9d / %d" % (shot, b[0], b[1], a[0], a[1]))
+        else:
+            print("%-26s   (new shot)                %9d / %d" % (shot, a[0], a[1]))
 
 
 if __name__ == "__main__":
