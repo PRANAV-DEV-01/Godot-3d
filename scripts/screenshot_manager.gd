@@ -33,22 +33,21 @@ func _process(delta: float) -> void:
 				# Spawn point facing into room
 				_snap_and_capture(Vector3(0, 1.2, 6), Vector3(0, 0, 0), "01_spawn_facing_room")
 			2:
-				# On platform looking back
-				_snap_and_capture(Vector3(-6, 3.2, -6), Vector3(0, 0.3, 0), "02_platform_looking_back")
+				# On platform looking back into the room (clear of geometry)
+				_snap_and_capture(Vector3(-6, 2.8, -6), Vector3(0, 1.2, 4), "02_platform_looking_back")
 			3:
-				# Near wall-run wall
-				_snap_and_capture(Vector3(-1.5, 2.0, -2), Vector3(0, 0, 0), "03_wallrun_approach")
+				# Wall-run approach — mid-corridor, clear of both walls
+				_snap_and_capture(Vector3(0, 2.0, 4), Vector3(0, 2.0, -6), "03_wallrun_approach")
 				auto_done = true
 
 
 func _snap_and_capture(pos: Vector3, look_target: Vector3, filename: String) -> void:
 	player.global_position = pos
-	player.global_position.y = 1.2
-	var dir := (look_target - pos).normalized()
-	if dir.length_squared() > 0.01:
-		player.rotation.y = atan2(dir.x, dir.z)
-	cam.rotation.x = 0.0
-	cam.rotation.z = 0.0
+	var dir := look_target - pos
+	var hor := Vector2(dir.x, dir.z).length()
+	if hor > 0.01:
+		cam.set("yaw", atan2(-dir.x, -dir.z))
+		cam.set("pitch", atan2(dir.y, hor))
 	# wait 2 frames for physics/camera to settle
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -57,6 +56,9 @@ func _snap_and_capture(pos: Vector3, look_target: Vector3, filename: String) -> 
 
 func _capture(label: String) -> void:
 	var img := get_viewport().get_texture().get_image()
+	if img == null:
+		print("[Screenshot] Skipping (no viewport image available)", label)
+		return
 	var path := screenshot_dir + label + ".png"
 	img.save_png(path)
 	print("[Screenshot] Saved: ", path)

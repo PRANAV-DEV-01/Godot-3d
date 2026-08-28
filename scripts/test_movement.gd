@@ -17,7 +17,15 @@ func _init() -> void:
 	print("[MovementTest] Scene loaded, waiting for build...")
 
 func _idle(_delta: float) -> bool:
-	frames += 1
+	return _step(_delta)
+
+
+func _process(_delta: float) -> bool:
+	return _step(_delta)
+
+
+func _step(_delta: float) -> bool:
+	frames = int(Engine.get_physics_frames())
 	var player = main_scene.get_node_or_null("Player")
 	if not player:
 		return false
@@ -171,8 +179,7 @@ func _log(msg: String) -> void:
 
 
 func _sim(action: String, pressed: bool) -> void:
-	var ev := InputEventAction.new()
-	ev.action = action
-	ev.pressed = pressed
-	ev.strength = 1.0 if pressed else 0.0
-	Input.parse_input_event(ev)
+	if pressed:
+		Input.action_press(action)
+	else:
+		Input.action_release(action)

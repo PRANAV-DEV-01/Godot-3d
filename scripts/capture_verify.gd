@@ -26,15 +26,15 @@ func _idle(_delta: float) -> bool:
 		1:
 			if frames >= wait_until:
 				_take("01_spawn_facing_room")
-				_move(Vector3(-6, 3.2, -6), atan2(1.0, 1.0))
-				_set_cam(Vector3(-6, 3.2, -6), Vector3(-8, 2, -8))
+				_move(Vector3(-6, 2.8, -6), atan2(1.0, 1.0))
+				_set_cam(Vector3(-6, 2.8, -6), Vector3(0, 1.2, 4))
 				wait_until = frames + 120
 				phase = 2
 		2:
 			if frames >= wait_until:
 				_take("02_platform_looking_back")
-				_move(Vector3(-1.5, 2.0, -2), 0.0)
-				_set_cam(Vector3(-1.5, 2.0, -2), Vector3(-1.5, 2.5, -6))
+				_move(Vector3(0, 2.0, 4), 0.0)
+				_set_cam(Vector3(0, 2.0, 4), Vector3(0, 2.0, -6))
 				wait_until = frames + 120
 				phase = 3
 		3:

@@ -95,7 +95,7 @@ func _make_wall_mat() -> ShaderMaterial:
 	mat.set_shader_parameter("metallic", 0.0)
 	mat.set_shader_parameter("noise_scale", 8.0)
 	mat.set_shader_parameter("noise_strength", 0.15)
-	mat.set_shader_parameter("tiling", Vector2(2.0, 1.0))
+	mat.set_shader_parameter("tiling", Vector2(8.0, 2.0))
 	return mat
 
 
@@ -105,9 +105,9 @@ func _make_perim_wall_mat() -> ShaderMaterial:
 	mat.set_shader_parameter("base_color", Color(0.32, 0.31, 0.30))
 	mat.set_shader_parameter("roughness", 0.92)
 	mat.set_shader_parameter("metallic", 0.0)
-	mat.set_shader_parameter("noise_scale", 6.0)
+	mat.set_shader_parameter("noise_scale", 10.0)
 	mat.set_shader_parameter("noise_strength", 0.1)
-	mat.set_shader_parameter("tiling", Vector2(3.0, 1.0))
+	mat.set_shader_parameter("tiling", Vector2(8.0, 2.0))
 	return mat
 
 
@@ -118,7 +118,7 @@ func _make_wallrun_mat(accent: Color) -> ShaderMaterial:
 	mat.set_shader_parameter("accent_color", accent)
 	mat.set_shader_parameter("roughness", 0.35)
 	mat.set_shader_parameter("metallic", 0.7)
-	mat.set_shader_parameter("stripe_freq", 8.0)
+	mat.set_shader_parameter("stripe_freq", 12.0)
 	return mat
 
 
@@ -129,6 +129,7 @@ func _make_platform_mat() -> ShaderMaterial:
 	mat.set_shader_parameter("accent_color", Color(0.9, 0.55, 0.15))
 	mat.set_shader_parameter("roughness", 0.4)
 	mat.set_shader_parameter("metallic", 0.6)
+	mat.set_shader_parameter("noise_scale", 28.0)
 	return mat
 
 
@@ -138,9 +139,9 @@ func _make_ledge_mat() -> ShaderMaterial:
 	mat.set_shader_parameter("base_color", Color(0.35, 0.33, 0.30))
 	mat.set_shader_parameter("roughness", 0.85)
 	mat.set_shader_parameter("metallic", 0.0)
-	mat.set_shader_parameter("noise_scale", 10.0)
+	mat.set_shader_parameter("noise_scale", 8.0)
 	mat.set_shader_parameter("noise_strength", 0.1)
-	mat.set_shader_parameter("tiling", Vector2(2.0, 2.0))
+	mat.set_shader_parameter("tiling", Vector2(3.0, 1.0))
 	return mat
 
 
@@ -176,7 +177,7 @@ float noise(vec2 p) {
 float fbm(vec2 p) {
 	float v = 0.0;
 	float a = 0.5;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 5; i++) {
 		v += a * noise(p);
 		p *= 2.0;
 		a *= 0.5;
@@ -186,15 +187,18 @@ float fbm(vec2 p) {
 
 void fragment() {
 	vec2 uv = UV * tiling;
-	float n = fbm(uv * noise_scale) * noise_strength;
-	float n2 = fbm(uv * noise_scale * 3.0 + 42.0) * noise_strength * 0.5;
+	float n = fbm(uv) * noise_strength;
+	float n2 = fbm(uv * 2.0 + 17.0) * noise_strength * 0.7;
+	float grain = fbm(uv * 8.0 + 101.0) * noise_strength * 0.35;
 	vec3 col = base_color * (1.0 + n - noise_strength * 0.5);
 	col *= 0.95 + n2;
-	float r = roughness + n * 0.3;
+	col *= 0.98 + grain;
+	float r = clamp(roughness + (n + n2) * 0.3, 0.0, 1.0);
 	ALBEDO = col;
-	ROUGHNESS = clamp(r, 0.0, 1.0);
+	ROUGHNESS = r;
 	METALLIC = metallic;
-	AO = 1.0 - n * 0.3;
+	AO = clamp(1.0 - (n + n2) * 0.3, 0.0, 1.0);
+}
 """
 	return s
 
@@ -233,11 +237,12 @@ void fragment() {
 	edge += smoothstep(0.02, 0.0, uv.y) + smoothstep(0.98, 1.0, uv.y);
 	col *= 0.85 + 0.15 * (1.0 - min(edge, 1.0));
 	// noise variation
-	float n = noise(uv * 20.0) * 0.08;
+	float n = noise(uv * 24.0) * 0.08;
 	col *= 1.0 + n - 0.04;
 	ALBEDO = col;
-	ROUGHNESS = roughness + n * 0.2;
+	ROUGHNESS = clamp(roughness + n * 0.2, 0.0, 1.0);
 	METALLIC = metallic;
+}
 """
 	return s
 
@@ -252,6 +257,7 @@ uniform vec3 base_color : source_color = vec3(0.25);
 uniform vec3 accent_color : source_color = vec3(0.9, 0.55, 0.15);
 uniform float roughness : hint_range(0.0, 1.0) = 0.4;
 uniform float metallic : hint_range(0.0, 1.0) = 0.6;
+uniform float noise_scale : hint_range(1.0, 60.0) = 24.0;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -268,15 +274,18 @@ float noise(vec2 p) {
 void fragment() {
 	vec2 uv = UV;
 	// safety stripe along top edge
-	float edge = smoothstep(0.15, 0.0, uv.y) + smoothstep(0.85, 1.0, uv.y);
+	float edge = smoothstep(0.12, 0.0, uv.y) + smoothstep(0.88, 1.0, uv.y);
 	vec3 col = mix(base_color, accent_color, edge * 0.8);
-	// diamond plate pattern
-	float d = noise(uv * 30.0);
-	col *= 0.95 + d * 0.1;
-	float n = noise(uv * 15.0 + 100.0) * 0.06;
-	ALBEDO = col * (1.0 + n - 0.03);
-	ROUGHNESS = roughness + n * 0.15;
+	// diamond plate pattern + fine grain
+	float d = noise(uv * noise_scale);
+	float n = noise(uv * noise_scale * 3.0 + 100.0) * 0.08;
+	float g = noise(uv * noise_scale * 8.0 + 211.0) * 0.05;
+	col *= 0.94 + d * 0.12;
+	col *= 0.98 + g;
+	ALBEDO = col * (1.0 + n - 0.04);
+	ROUGHNESS = clamp(roughness + n * 0.15, 0.0, 1.0);
 	METALLIC = metallic;
+}
 """
 	return s
 
