@@ -30,8 +30,8 @@ func _build() -> void:
 	# ── Materials ───────────────────────────────────────────────
 	var mat_floor := _make_floor_mat()
 	var mat_pw := _make_perim_wall_mat()
-	var mat_wr1 := _make_wallrun_mat(Color(0.15, 0.65, 0.3))
-	var mat_wr2 := _make_wallrun_mat(Color(0.2, 0.7, 0.35))
+	var mat_wr1 := _make_wallrun_mat()
+	var mat_wr2 := _make_wallrun_mat()
 	var mat_plat := _make_platform_mat()
 	var mat_ledge := _make_ledge_mat()
 
@@ -97,14 +97,15 @@ func _make_perim_wall_mat() -> ShaderMaterial:
 	return mat
 
 
-func _make_wallrun_mat(accent: Color) -> ShaderMaterial:
+func _make_wallrun_mat() -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
-	mat.shader = _make_wallrun_shader()
-	mat.set_shader_parameter("base_color", Color(0.22, 0.22, 0.24))
-	mat.set_shader_parameter("accent_color", accent)
-	mat.set_shader_parameter("roughness", 0.35)
-	mat.set_shader_parameter("metallic", 0.7)
-	mat.set_shader_parameter("stripe_freq", 34.0)
+	mat.shader = _make_pbr_shader()
+	mat.set_shader_parameter("base_color", Color(0.95, 0.58, 0.15))
+	mat.set_shader_parameter("roughness", 0.92)
+	mat.set_shader_parameter("metallic", 0.0)
+	mat.set_shader_parameter("noise_scale", 10.0)
+	mat.set_shader_parameter("noise_strength", 0.1)
+	mat.set_shader_parameter("tiling", Vector2(8.0, 2.0))
 	return mat
 
 
@@ -185,55 +186,6 @@ void fragment() {
 	ROUGHNESS = r;
 	METALLIC = metallic;
 	AO = clamp(1.0 - (n + n2) * 0.3, 0.0, 1.0);
-}
-"""
-	return s
-
-
-func _make_wallrun_shader() -> Shader:
-	var s := Shader.new()
-	s.code = """
-shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back;
-
-uniform vec3 base_color : source_color = vec3(0.2);
-uniform vec3 accent_color : source_color = vec3(0.2, 0.7, 0.3);
-uniform float roughness : hint_range(0.0, 1.0) = 0.35;
-uniform float metallic : hint_range(0.0, 1.0) = 0.7;
-uniform float stripe_freq : hint_range(2.0, 128.0) = 24.0;
-
-float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
-	           mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
-}
-
-void fragment() {
-	vec2 uv = UV;
-	vec3 col = base_color;
-	// anti-aliased stripes, height-axis anchored (local Y). Edge width is
-	// derived from how fast the pattern coordinate changes per pixel
-	// (fwidth via dFdx+dFdy), so stripes stay crisp up close and blend to a
-	// smooth tone instead of shimmering/moireing once a pixel spans several
-	// stripe cycles. stripe=0 on the dark base; bright band near top of each period.
-	float coord = VERTEX.y * stripe_freq;
-	float aa = abs(dFdx(coord)) + abs(dFdy(coord));
-	float b = fract(coord);
-	float stripe = smoothstep(0.72 - aa, 0.72 + aa, b) * (1.0 - smoothstep(0.92 - aa, 0.92 + aa, b));
-	col = mix(col, accent_color, stripe * 0.9);
-	float edge = smoothstep(0.02, 0.0, uv.y) + smoothstep(0.98, 1.0, uv.y);
-	col *= 0.9 + 0.1 * (1.0 - min(edge, 1.0));
-	float n = noise(uv * 20.0) * 0.04;
-	col *= 1.0 + n;
-	ALBEDO = col;
-	ROUGHNESS = roughness + n * 0.2;
-	METALLIC = metallic;
 }
 """
 	return s
@@ -374,9 +326,9 @@ func _build_lighting(root: Node3D) -> void:
 
 	# Accent spotlights on gameplay features
 	_add_spot(root, Vector3(-2, 5.5, -2), Vector3(-90, 0, 0), 6.0, 0.6,
-		Color(0.4, 1.0, 0.5), "SpotWallRunL")
+		Color(1.0, 0.75, 0.3), "SpotWallRunL")
 	_add_spot(root, Vector3(2, 5.5, -2), Vector3(-90, 0, 0), 6.0, 0.6,
-		Color(0.5, 1.0, 0.55), "SpotWallRunR")
+		Color(1.0, 0.78, 0.33), "SpotWallRunR")
 	_add_spot(root, Vector3(-6, 4.5, -6), Vector3(-90, 0, 0), 5.0, 0.7,
 		Color(1.0, 0.7, 0.3), "SpotPlatform")
 	_add_spot(root, Vector3(0, 5.0, 4), Vector3(-90, 0, 0), 7.0, 0.35,
