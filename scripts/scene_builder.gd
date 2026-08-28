@@ -118,7 +118,7 @@ func _make_wallrun_mat(accent: Color) -> ShaderMaterial:
 	mat.set_shader_parameter("accent_color", accent)
 	mat.set_shader_parameter("roughness", 0.35)
 	mat.set_shader_parameter("metallic", 0.7)
-	mat.set_shader_parameter("stripe_freq", 12.0)
+	mat.set_shader_parameter("stripe_freq", 34.0)
 	return mat
 
 
@@ -213,7 +213,7 @@ uniform vec3 base_color : source_color = vec3(0.2);
 uniform vec3 accent_color : source_color = vec3(0.2, 0.7, 0.3);
 uniform float roughness : hint_range(0.0, 1.0) = 0.35;
 uniform float metallic : hint_range(0.0, 1.0) = 0.7;
-uniform float stripe_freq : hint_range(1.0, 20.0) = 8.0;
+uniform float stripe_freq : hint_range(2.0, 128.0) = 24.0;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -232,6 +232,9 @@ void fragment() {
 	// horizontal stripes (caution pattern)
 	float stripe = smoothstep(0.45, 0.5, fract(uv.y * stripe_freq));
 	vec3 col = mix(base_color, accent_color, stripe * 0.7);
+	// subtle vertical panel lines -> wall reads as small repeating tiles
+	float line = smoothstep(0.86, 0.98, fract(uv.x * 3.0));
+	col = mix(col, base_color * 0.55, line * 0.55);
 	// add subtle panel lines at edges
 	float edge = smoothstep(0.02, 0.0, uv.x) + smoothstep(0.98, 1.0, uv.x);
 	edge += smoothstep(0.02, 0.0, uv.y) + smoothstep(0.98, 1.0, uv.y);
