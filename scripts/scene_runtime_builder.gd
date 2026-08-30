@@ -17,7 +17,7 @@ func _build() -> void:
 	if not root:
 		return
 
-	print("[Phase2-Runtime] Rebuilding room visuals...")
+	print("[Phase2-Runtime] Rebuilding room visuals (3-room course)...")
 
 	# ── Strip old geometry ──────────────────────────────────────
 	var room := root.get_node_or_null("Room")
@@ -27,7 +27,41 @@ func _build() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 
-	# ── Materials ───────────────────────────────────────────────
+	# ── Room 1 — unchanged Phase 1/2 vertical dash + wall-run test floor ──
+	_build_room_one(room)
+
+	# ── Room 2 — slide + dash-required gap, offset +20 x ─────────
+	var room2 := Node3D.new()
+	room2.name = "Room2"
+	room2.position = Vector3(20, 0, 0)
+	root.add_child(room2)
+	room2.owner = root.owner
+	_build_room_two(room2)
+
+	# ── Room 3 — vertical wall-run / climb / dash combo + finish, offset +42 x ──
+	var room3 := Node3D.new()
+	room3.name = "Room3"
+	room3.position = Vector3(42, 0, 0)
+	root.add_child(room3)
+	room3.owner = root.owner
+	_build_room_three(room3)
+
+	# ── Shared systems ──────────────────────────────────────────
+	_build_lighting(root)
+	_build_particles(root)
+	_build_dressing(room)
+	_rebuild_env(root)
+	_build_tramers(root)
+	_build_managers(root)
+
+	print("[Phase2-Runtime] Done! (3 rooms, 4 triggers)")
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  ROOM BUILDERS
+# ══════════════════════════════════════════════════════════════════════
+
+func _build_room_one(room: Node3D) -> void:
 	var mat_floor := _make_floor_mat()
 	var mat_pw := _make_perim_wall_mat()
 	var mat_wr1 := _make_wallrun_mat()
@@ -35,38 +69,184 @@ func _build() -> void:
 	var mat_plat := _make_platform_mat()
 	var mat_ledge := _make_ledge_mat()
 
-	# ── Floor ───────────────────────────────────────────────────
 	_add_box(room, Vector3(20, 0.4, 20), Vector3.ZERO, mat_floor, "Floor", 1, "concrete")
-	# ── Perimeter walls ─────────────────────────────────────────
 	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, -9.8), mat_pw, "WallNorth", 1, "concrete")
 	_add_box(room, Vector3(20, 6, 0.4), Vector3(0, 3, 9.8), mat_pw, "WallSouth", 1, "concrete")
 	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(9.8, 3, 0), mat_pw, "WallEast", 1, "concrete")
 	_add_box_rot_y(room, Vector3(0.4, 6, 20), Vector3(-9.8, 3, 0), mat_pw, "WallWest", 1, "concrete")
-	# ── Wall-run walls ──────────────────────────────────────────
 	_add_box(room, Vector3(0.4, 6, 10), Vector3(-2, 3, -2), mat_wr1, "WallRunLeft", 2, "metal")
 	_add_box(room, Vector3(0.4, 6, 10), Vector3(2, 3, -2), mat_wr2, "WallRunRight", 2, "metal")
-	# ── Platform ────────────────────────────────────────────────
 	_add_box(room, Vector3(4, 2, 4), Vector3(-6, 1, -6), mat_plat, "Platform", 1, "metal")
-	# ── Ledge ───────────────────────────────────────────────────
 	_add_box(room, Vector3(5, 1.0, 2), Vector3(6, 0.5, -4), mat_ledge, "LedgeBlock", 1, "concrete")
 	_add_box(room, Vector3(5, 0.4, 8), Vector3(6, 1.2, -4), mat_ledge, "LedgeTop", 1, "concrete")
 
-	# ── Lighting ────────────────────────────────────────────────
-	_build_lighting(root)
 
-	# ── Particles ───────────────────────────────────────────────
-	_build_particles(root)
+func _build_room_two(room: Node3D) -> void:
+	# Identity tint — slate blue (distinct from Room 1 grey and Room 3 amber).
+	var mat_floor := _make_tinted_pbr(Color(0.20, 0.27, 0.36))
+	var mat_pw := _make_tinted_pbr(Color(0.24, 0.30, 0.39))
+	var mat_pit := _make_tinted_pbr(Color(0.15, 0.19, 0.26))
+	var mat_barrier := _make_tinted_pbr(Color(0.30, 0.30, 0.33))
 
-	# ── Set dressing ────────────────────────────────────────────
-	_build_dressing(room)
+	# Run direction: -z, entrance → exit.
+	_add_box(room, Vector3(12, 0.4, 18), Vector3(0, 0.2, 8), mat_floor, "FloorEntrance", 1, "concrete")
+	_add_box(room, Vector3(13, 0.4, 5), Vector3(0, 0.2, -14), mat_floor, "FloorExit", 1, "concrete")
+	_add_box(room, Vector3(13, 0.4, 9), Vector3(0, -5.8, -6), mat_pit, "PitFloor", 1, "concrete")
+	# Slide-under barrier — spans the corridor width (x), thin in the run direction.
+	# Layer 3 so the body collides AND the ceiling ray sees it.
+	_add_box(room, Vector3(11.6, 1.2, 0.4), Vector3(0, 2.0, 10), mat_barrier, "SlideBarrier", 3, "metal")
+	_add_box(room, Vector3(12, 6, 0.4), Vector3(0, 3, -16.7), mat_pw, "WallNorth", 1, "concrete")
+	_add_box(room, Vector3(12, 6, 0.4), Vector3(0, 3, 17.2), mat_pw, "WallSouth", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 34), Vector3(6, 3, 0.2), mat_pw, "WallEast", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 34), Vector3(-6, 3, 0.2), mat_pw, "WallWest", 1, "concrete")
 
-	# ── Environment ─────────────────────────────────────────────
-	_rebuild_env(root)
+	# Glowing clearance strip on the barrier underside (visual affordance).
+	var strip := MeshInstance3D.new()
+	var strip_mesh := BoxMesh.new()
+	strip_mesh.size = Vector3(11.6, 0.05, 0.05)
+	strip.mesh = strip_mesh
+	strip.position = Vector3(0, 1.382, 10)
+	var strip_mat := StandardMaterial3D.new()
+	strip_mat.albedo_color = Color(1.0, 0.72, 0.2)
+	strip_mat.emission_enabled = true
+	strip_mat.emission = Color(1.0, 0.6, 0.15)
+	strip_mat.emission_energy_multiplier = 1.8
+	strip.set_surface_override_material(0, strip_mat)
+	room.add_child(strip)
+	strip.owner = room.owner
 
-	# ── Managers (feedback, audio, screenshots) ─────────────────
-	_build_managers(root)
+	# Dash-required gap z -11.5..-1.5 (10 m) between the two floor slabs.
 
-	print("[Phase2-Runtime] Done!")
+
+func _build_room_three(room: Node3D) -> void:
+	# Identity tint — warm grey/brown; amber reused for wall-run surfaces.
+	var mat_floor := _make_tinted_pbr(Color(0.30, 0.28, 0.24))
+	var mat_pw := _make_tinted_pbr(Color(0.34, 0.32, 0.28))
+	var mat_pit := _make_tinted_pbr(Color(0.16, 0.18, 0.22))
+	var mat_wr1 := _make_wallrun_mat()
+	var mat_wr2 := _make_wallrun_mat()
+	var mat_pad := _make_tinted_pbr(Color(0.25, 0.25, 0.27))
+
+	# Run direction: -z; spawn at z=2.
+	_add_box(room, Vector3(8, 0.4, 26), Vector3(0, 0.2, -10), mat_floor, "Floor", 1, "concrete")
+	_add_box(room, Vector3(8, 6, 0.4), Vector3(0, 3, 3.4), mat_pw, "WallSouth", 1, "concrete")
+	_add_box(room, Vector3(8, 6, 0.4), Vector3(0, 3, -23.4), mat_pw, "WallNorth", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 26), Vector3(4, 3, -10), mat_pw, "WallEast", 1, "concrete")
+	_add_box_rot_y(room, Vector3(0.4, 6, 26), Vector3(-4, 3, -10), mat_pw, "WallWest", 1, "concrete")
+
+	# Wall-run channel walls (layer 2 — pass-through, raycast surfaced).
+	_add_box(room, Vector3(0.4, 7, 10), Vector3(-2, 3.5, -2), mat_wr1, "WallRunLeft", 2, "metal")
+	_add_box(room, Vector3(0.4, 7, 10), Vector3(2, 3.5, -2), mat_wr2, "WallRunRight", 2, "metal")
+
+	# Jump-able mid platform (top = floor + 1.35, feet y 1.75) before the gap.
+	_add_box(room, Vector3(4, 1.35, 3), Vector3(0, 1.075, -9.5), mat_pad, "MidPlatform", 1, "metal")
+
+	# Dash-required gap from the mid platform lip (z -8) to the finish pad lip (z -16).
+	_add_box(room, Vector3(4, 0.5, 4), Vector3(0, 2.95, -18), mat_pad, "FinishPad", 1, "metal")
+	_add_box(room, Vector3(4, 0.4, 9), Vector3(0, -5.8, -12.5), mat_pit, "PitCatch", 1, "concrete")
+
+	# Glowing finish marker on the pad (built-in emission, no custom shader).
+	_add_finish_marker(room)
+
+
+func _add_finish_marker(room: Node3D) -> void:
+	# Beacon pole
+	var pole := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.06
+	cyl.bottom_radius = 0.09
+	cyl.height = 2.0
+	pole.mesh = cyl
+	pole.position = Vector3(0, 4.2, -18)
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color(0.32, 0.32, 0.35)
+	pole_mat.metallic = 0.7
+	pole_mat.roughness = 0.4
+	pole.set_surface_override_material(0, pole_mat)
+	room.add_child(pole)
+	pole.owner = room.owner
+
+	# Glowing beacon orb
+	var orb := MeshInstance3D.new()
+	var sp := SphereMesh.new()
+	sp.radius = 0.3
+	sp.height = 0.6
+	orb.mesh = sp
+	orb.position = Vector3(0, 5.5, -18)
+	var orb_mat := StandardMaterial3D.new()
+	orb_mat.albedo_color = Color(1.0, 0.88, 0.4)
+	orb_mat.emission_enabled = true
+	orb_mat.emission = Color(1.0, 0.72, 0.2)
+	orb_mat.emission_energy_multiplier = 3.0
+	orb.set_surface_override_material(0, orb_mat)
+	room.add_child(orb)
+	orb.owner = room.owner
+
+	# Base ring on the pad surface
+	var ring := MeshInstance3D.new()
+	var ring_mesh := CylinderMesh.new()
+	ring_mesh.top_radius = 0.9
+	ring_mesh.bottom_radius = 0.9
+	ring_mesh.height = 0.02
+	ring.mesh = ring_mesh
+	ring.position = Vector3(0, 3.21, -18)
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.albedo_color = Color(1.0, 0.85, 0.3)
+	ring_mat.emission_enabled = true
+	ring_mat.emission = Color(1.0, 0.7, 0.2)
+	ring_mat.emission_energy_multiplier = 2.0
+	ring.set_surface_override_material(0, ring_mat)
+	room.add_child(ring)
+	ring.owner = room.owner
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  TRAMERS — room transition triggers (Area3D, global coordinates).
+# ══════════════════════════════════════════════════════════════════════
+
+func _build_tramers(root: Node3D) -> void:
+	# Room 1 → Room 2 (north end of the corridor).
+	_add_trigger(root, "TriggerRoom1Exit",
+		Vector3(0, 1.5, -8.4), Vector3(4, 3, 1.6),
+		Vector3(20, 1.2, 15), 2, false, "Room1 exit")
+	# Room 2 → Room 3 (on the exit slab).
+	_add_trigger(root, "TriggerRoom2Exit",
+		Vector3(20, 1.5, -14), Vector3(6, 3, 1.4),
+		Vector3(42, 1.2, 1), 3, false, "Room2 exit")
+	# Room 2 pit fallback — reset to the Room 2 spawn.
+	_add_trigger(root, "TriggerRoom2PitReset",
+		Vector3(20, -5.3, -6), Vector3(13, 0.6, 9),
+		Vector3(20, 1.2, 15), 2, false, "Room2 pit fall")
+	# Room 3 pit fallback — reset to the Room 3 spawn.
+	_add_trigger(root, "TriggerRoom3PitReset",
+		Vector3(42, -5.3, -12.5), Vector3(4, 0.6, 9),
+		Vector3(42, 1.2, 1), 3, false, "Room3 pit fall")
+	# Room 3 finish beacon — end of run, reset to the Room 1 spawn.
+	_add_trigger(root, "TriggerFinish",
+		Vector3(42, 4.2, -18), Vector3(4, 2.4, 4),
+		Vector3(0, 1.2, 6), 1, true, "Room3 finish")
+
+
+func _add_trigger(root: Node3D, trigger_name: String, pos: Vector3, size: Vector3,
+		dest: Vector3, target_room: int, finish: bool, label: String) -> void:
+	var area := Area3D.new()
+	area.name = trigger_name
+	area.set_script(load("res://scripts/room_trigger.gd"))
+	area.position = pos
+	root.add_child(area)
+	area.owner = root.owner
+
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	area.add_child(col)
+	col.owner = root.owner
+
+	area.destination = dest
+	area.target_room = target_room
+	area.is_finish = finish
+	area.label = label
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -129,6 +309,19 @@ func _make_ledge_mat() -> ShaderMaterial:
 	mat.set_shader_parameter("noise_scale", 8.0)
 	mat.set_shader_parameter("noise_strength", 0.1)
 	mat.set_shader_parameter("tiling", Vector2(3.0, 1.0))
+	return mat
+
+
+## Per-room identity tint via the same noise PBR shader (no new shader).
+func _make_tinted_pbr(base_color: Color) -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = _make_pbr_shader()
+	mat.set_shader_parameter("base_color", base_color)
+	mat.set_shader_parameter("roughness", 0.9)
+	mat.set_shader_parameter("metallic", 0.0)
+	mat.set_shader_parameter("noise_scale", 10.0)
+	mat.set_shader_parameter("noise_strength", 0.1)
+	mat.set_shader_parameter("tiling", Vector2(8.0, 2.0))
 	return mat
 
 
@@ -338,6 +531,28 @@ func _build_lighting(root: Node3D) -> void:
 	_add_omni(root, Vector3(-8, 4, -8), 8.0, 0.3, Color(0.9, 0.85, 0.7))
 	_add_omni(root, Vector3(8, 4, 4), 8.0, 0.25, Color(0.7, 0.8, 0.9))
 
+	# ── Room 2 accents ───────────────────────────────────────────
+	_add_spot(root, Vector3(20, 5.2, 10), Vector3(-90, 0, 0), 7.0, 0.55,
+		Color(1.0, 0.75, 0.3), "SpotBarrier2")
+	_add_spot(root, Vector3(20, 4.8, -6), Vector3(-90, 0, 0), 6.0, 0.5,
+		Color(0.6, 0.7, 1.0), "SpotGap2")
+	_add_spot(root, Vector3(20, 5.0, 16), Vector3(-90, 0, 0), 6.0, 0.4,
+		Color(0.85, 0.8, 0.95), "SpotSpawn2")
+
+	# ── Room 3 accents ───────────────────────────────────────────
+	_add_spot(root, Vector3(40, 5.6, -2), Vector3(-90, 0, 0), 7.0, 0.6,
+		Color(1.0, 0.75, 0.3), "SpotChannelL3")
+	_add_spot(root, Vector3(44, 5.6, -2), Vector3(-90, 0, 0), 7.0, 0.6,
+		Color(1.0, 0.78, 0.33), "SpotChannelR3")
+	_add_spot(root, Vector3(42, 6.0, -18), Vector3(-90, 0, 0), 8.0, 0.9,
+		Color(1.0, 0.85, 0.5), "SpotFinish3")
+	_add_spot(root, Vector3(42, 4.0, -13), Vector3(-90, 0, 0), 6.0, 0.4,
+		Color(0.7, 0.75, 0.95), "SpotGap3")
+
+	_add_omni(root, Vector3(20, 3.5, 0), 9.0, 0.25, Color(0.9, 0.85, 0.7))
+	_add_omni(root, Vector3(42, 3.5, -9), 9.0, 0.25, Color(0.9, 0.85, 0.7))
+	_add_omni(root, Vector3(42, 5.0, -18), 6.0, 0.8, Color(1.0, 0.8, 0.4))
+
 
 func _add_spot(parent: Node3D, pos: Vector3, rot: Vector3, range_: float,
 		energy: float, col: Color, spot_name: String) -> void:
@@ -380,10 +595,11 @@ func _build_particles(root: Node3D) -> void:
 	dust.name = "DustMotes"
 	dust.amount = 60
 	dust.lifetime = 6.0
-	dust.visibility_aabb = AABB(Vector3(-12, 0, -12), Vector3(24, 7, 24))
+	dust.position = Vector3(20, 1.5, 0)
+	dust.visibility_aabb = AABB(Vector3(-13, -1, -17), Vector3(66, 9, 34))
 	var dust_mat := ParticleProcessMaterial.new()
 	dust_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	dust_mat.emission_box_extents = Vector3(10, 3, 10)
+	dust_mat.emission_box_extents = Vector3(32, 4, 16)
 	dust_mat.direction = Vector3(0, 0.2, 0)
 	dust_mat.spread = 30.0
 	dust_mat.initial_velocity_min = 0.05

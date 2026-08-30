@@ -22,7 +22,8 @@ func _process(_delta: float) -> void:
 		wall_run_str = "\nWall-Run: %.1fs" % player.wall_run_timer
 
 	label.text = (
-		"State: %s\n" % state_name
+		"Room: %d\n" % player.current_room
+		+ "State: %s\n" % state_name
 		+ "Speed: %.1f u/s\n" % spd
 		+ "Dash CD: %s\n" % dash_str
 		+ "Coyote: %s | Buffer: %s" % [coyote_str, buffer_str]

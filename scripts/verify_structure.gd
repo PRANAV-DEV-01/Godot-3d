@@ -13,7 +13,7 @@ func _init() -> void:
 	main_scene = packed.instantiate()
 	root.add_child(main_scene)
 
-func _idle(_delta: float) -> bool:
+func _process(_delta: float) -> bool:
 	if done:
 		return true
 	frames += 1
@@ -39,6 +39,30 @@ func _idle(_delta: float) -> bool:
 			checks.append("  %s -> %s" % [path.get_file(), surf])
 		else:
 			checks.append("  %s -> MISSING" % path.get_file())
+
+	# 2b. New rooms
+	for rname in ["Room2", "Room3"]:
+		var r = main_scene.get_node_or_null(rname)
+		if r:
+			checks.append("%s: OK (%d geometry nodes, pos=%s)" % [rname, r.get_children().size(), r.position])
+		else:
+			checks.append("%s: MISSING" % rname)
+	for path in ["Room2/SlideBarrier", "Room2/FloorEntrance", "Room3/WallRunLeft", "Room3/MidPlatform", "Room3/FinishPad"]:
+		var node = main_scene.get_node_or_null(path)
+		if node:
+			var surf = node.get_meta("surface_type", "?")
+			var layer = node.collision_layer
+			checks.append("  %s -> %s (layer=%d)" % [path, surf, layer])
+		else:
+			checks.append("  %s -> MISSING" % path)
+
+	# 2c. Triggers
+	for tname in ["TriggerRoom1Exit", "TriggerRoom2Exit", "TriggerRoom2PitReset", "TriggerFinish"]:
+		var t = main_scene.get_node_or_null(tname)
+		if t:
+			checks.append("  Trigger %s: OK (dest=%s room=%d finish=%s)" % [tname, t.destination, t.target_room, t.is_finish])
+		else:
+			checks.append("  Trigger %s: MISSING" % tname)
 
 	# 3. Lighting
 	var sun = main_scene.get_node_or_null("SunKey")

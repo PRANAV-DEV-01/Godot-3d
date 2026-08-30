@@ -32,6 +32,14 @@ var slide_timer := 0.0
 const SLIDE_DURATION := 0.8
 const SLIDE_BURST_MULT := 1.3
 var is_sliding := false
+# Squat collision shape so the player can pass under low barriers.
+const STAND_SHAPE_HEIGHT := 1.8
+const STAND_SHAPE_OFFSET := 0.0
+const SLIDE_SHAPE_HEIGHT := 0.8
+const SLIDE_SHAPE_OFFSET := -0.5
+
+## ── Room / Transitions ─────────────────────────────────────────────
+var current_room := 1
 
 ## ── Dash ───────────────────────────────────────────────────────────
 var dash_timer := 0.0
@@ -48,6 +56,7 @@ var is_dashing := false
 @onready var wall_left: RayCast3D   = $WallLeft
 @onready var wall_right: RayCast3D  = $WallRight
 @onready var ceiling_check: RayCast3D = $CeilingCheck
+@onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 ## ── Internal ───────────────────────────────────────────────────────
 var camera_node: Node = null
@@ -56,6 +65,7 @@ var camera_node: Node = null
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	camera_node = camera
+	add_to_group("player")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -96,7 +106,7 @@ func _state_ground(delta: float) -> void:
 
 	var input_dir := _get_input_direction()
 	var target_speed := sprint_speed if Input.is_action_pressed("sprint") else move_speed
-	var desired := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)) * target_speed
+	var desired := (transform.basis * Vector3(input_dir.y, 0, -input_dir.x)) * target_speed
 
 	velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
 	velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
@@ -127,7 +137,7 @@ func _state_air(delta: float) -> void:
 	velocity.y -= gravity * delta
 
 	var input_dir := _get_input_direction()
-	var desired := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)) * move_speed
+	var desired := (transform.basis * Vector3(input_dir.y, 0, -input_dir.x)) * move_speed
 	velocity.x = move_toward(velocity.x, desired.x, acceleration * delta)
 	velocity.z = move_toward(velocity.z, desired.z, acceleration * delta)
 
@@ -228,8 +238,12 @@ func _state_slide(delta: float) -> void:
 
 	var spd := Vector2(velocity.x, velocity.z).length()
 	if slide_timer <= 0.0 or spd < 2.0:
-		_exit_slide()
-		return
+		if ceiling_check.is_colliding():
+			# still under a low barrier — keep sliding instead of standing up
+			slide_timer = maxf(slide_timer, 0.35)
+		else:
+			_exit_slide()
+			return
 
 	if _try_dash():
 		_exit_slide()
@@ -256,6 +270,8 @@ func _state_dash(delta: float) -> void:
 ## ══════════════════════════════════════════════════════════════════════
 
 func _get_input_direction() -> Vector2:
+	# input_dir.x = forward(+1)/backward(-1); input_dir.y = left(-1)/right(+1).
+	# Map to camera-relative world axes: forward -> -basis.z, left -> +basis.x.
 	return Vector2(
 		Input.get_axis("move_backward", "move_forward"),
 		Input.get_axis("move_left", "move_right")
@@ -293,7 +309,7 @@ func _apply_dash() -> void:
 	var input_dir := _get_input_direction()
 	var dash_dir: Vector3
 	if input_dir.length() > 0.1:
-		dash_dir = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+		dash_dir = (transform.basis * Vector3(input_dir.y, 0, -input_dir.x)).normalized()
 	elif state == State.WALL_RUN:
 		dash_dir = wall_run_normal.normalized()  # push away from wall
 	else:
@@ -310,6 +326,7 @@ func _enter_slide() -> void:
 	state = State.SLIDE
 	slide_timer = SLIDE_DURATION
 	is_sliding = true
+	_set_shape_height(SLIDE_SHAPE_HEIGHT, SLIDE_SHAPE_OFFSET)
 
 	var spd := Vector2(velocity.x, velocity.z).length()
 	var burst_speed := maxf(spd, move_speed) * SLIDE_BURST_MULT
@@ -324,8 +341,33 @@ func _enter_slide() -> void:
 func _exit_slide() -> void:
 	is_sliding = false
 	state = State.GROUND
+	_set_shape_height(STAND_SHAPE_HEIGHT, STAND_SHAPE_OFFSET)
 	if camera_node and camera_node.has_method("end_slide"):
 		camera_node.end_slide()
+
+
+func _set_shape_height(h: float, y_off: float) -> void:
+	if not collision_shape:
+		return
+	var shape := collision_shape.shape as CapsuleShape3D
+	if shape:
+		shape.height = h
+		collision_shape.position.y = y_off
+
+
+## Teleport the player to a destination (global) and prep for the target room.
+func teleport_to(dest_pos: Vector3, room: int) -> void:
+	if is_sliding:
+		_exit_slide()
+	if state == State.WALL_RUN:
+		_exit_wall_run()
+	global_position = dest_pos
+	velocity = Vector3.ZERO
+	is_dashing = false
+	dash_timer = 0.0
+	dash_velocity = Vector3.ZERO
+	current_room = room
+	state = State.AIR
 
 
 ## ── Wall Run Helpers ───────────────────────────────────────────────
