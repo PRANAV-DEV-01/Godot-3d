@@ -102,8 +102,8 @@ func _process(_delta: float) -> bool:
 				_capture_or_report("04_corridor_down_length", Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
 				phase = 50
 
-		50:  # View 5: Room 2 straightaway — barrier, gap and pit in one frame
-			_pose(Vector3(20, 1.7, 14.5), Vector3(20, 1.6, 2))
+		50:  # View 5: Room 2 straightaway — full layout (slab → barrier → pit → exit slab)
+			_pose(Vector3(20, 3.0, 28), Vector3(20, 1.5, 0))
 			wait_frames = 0
 			wait_target = 20
 			phase = 51
@@ -112,7 +112,7 @@ func _process(_delta: float) -> bool:
 			wait_frames += 1
 			if wait_frames >= wait_target:
 				_debug_cam("before-room2-straightaway")
-				_capture_or_report("05_room2_straightaway", Vector3(20, 1.7, 14.5), Vector3(20, 1.6, 2))
+				_capture_or_report("05_room2_straightaway", Vector3(20, 3.0, 28), Vector3(20, 1.5, 0))
 				phase = 60
 
 		60:  # View 6: Room 2 slide barrier close-up (clearance strip visible)
