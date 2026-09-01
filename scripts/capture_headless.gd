@@ -102,8 +102,8 @@ func _process(_delta: float) -> bool:
 				_capture_or_report("04_corridor_down_length", Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
 				phase = 50
 
-		50:  # View 5: Room 2 straightaway — full layout (slab → barrier → pit → exit slab)
-			_pose(Vector3(20, 3.0, 28), Vector3(20, 1.5, 0))
+		50:  # View 5: Room 2 straightaway — exit slab receding, pit, slide barrier and entrance slab
+			_pose(Vector3(20, 1.5, -16.0), Vector3(20, 1.8, 6))
 			wait_frames = 0
 			wait_target = 20
 			phase = 51
@@ -112,7 +112,7 @@ func _process(_delta: float) -> bool:
 			wait_frames += 1
 			if wait_frames >= wait_target:
 				_debug_cam("before-room2-straightaway")
-				_capture_or_report("05_room2_straightaway", Vector3(20, 3.0, 28), Vector3(20, 1.5, 0))
+				_capture_or_report("05_room2_straightaway", Vector3(20, 1.5, -16.0), Vector3(20, 1.8, 6))
 				phase = 60
 
 		60:  # View 6: Room 2 slide barrier close-up (clearance strip visible)
@@ -237,13 +237,14 @@ func _debug_cam(label: String) -> void:
 		print("[Capture] debug: no cam")
 		return
 	var gp: Vector3 = player.global_position
+	var st: int = player.get("state")
 	var yaw: float = cam.get("yaw")
 	var pitch: float = cam.get("pitch")
 	var origin: Vector3 = cam.global_transform.origin
 	var arrow := -cam.global_transform.basis.z
 	var d := _ray_dist(origin, arrow)
-	print("[Capture] debug %s: player=%s cam_origin=%s yaw=%.2f pitch=%.2f fwd_hit=%.2f" % [
-		label, gp, origin, yaw, pitch, d])
+	print("[Capture] debug %s: player=%s state=%d cam_origin=%s yaw=%.2f pitch=%.2f fwd_hit=%.2f" % [
+		label, gp, st, origin, yaw, pitch, d])
 
 
 func _capture_or_report(label: String, pos: Vector3, look_at: Vector3) -> void:
