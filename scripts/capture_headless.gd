@@ -11,8 +11,8 @@ const MIN_DIST := 1.5
 
 var screenshot_dir := "user://verification_screenshots/"
 var phase := 0
-var wait_frames := 0
-var wait_target := 0
+var wait_time := 0.0
+var wait_target := 0.0
 var main_scene: Node
 
 
@@ -27,145 +27,135 @@ func _initialize() -> void:
 	main_scene = packed.instantiate()
 	root.add_child(main_scene)
 	print("[Capture] Scene loaded, waiting for render init...")
-	wait_frames = 0
-	wait_target = 90
+	wait_time = 0.0
+	wait_target = 4.0
 	_install_capture_aux()
 
 
-func _process(_delta: float) -> bool:
+func _process(delta: float) -> bool:
 	var player: Node = main_scene.get_node_or_null("Player") if main_scene else null
 	var cam: Camera3D = (player.get_node_or_null("CameraPivot/Camera3D") as Camera3D) if player else null
+	# Time-based wait: the scene renders at <1 FPS under software llvmpipe,
+	# so frame counting never advances — must wait on wall-clock time.
+	if wait_target > 0.0:
+		wait_time += delta
+		if wait_time < wait_target:
+			return false
+		wait_target = 0.0
 
 	match phase:
-		0:  # Wait for render/Vulkan init
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				var ss := main_scene.find_child("ScreenshotManager", true, false)
-				if ss:
-					ss.set("auto_done", true)
-					ss.set("auto_timer", 999999.0)
-					print("[Capture] Disabled ScreenshotManager auto-capture")
-				else:
-					print("[Capture] ScreenshotManager not found — will not disable")
-				print("[Capture] Init done, capturing views...")
-				phase = 10
+		0:  # Wait for render/Vulkan init (4 s wall-clock)
+			var ss := main_scene.find_child("ScreenshotManager", true, false)
+			if ss:
+				ss.set("auto_done", true)
+				ss.set("auto_timer", 999999.0)
+				print("[Capture] Disabled ScreenshotManager auto-capture")
+			else:
+				print("[Capture] ScreenshotManager not found — will not disable")
+			print("[Capture] Init done, capturing views...")
+			phase = 10
 
 		10:  # View 1: spawn facing room
 			_pose(Vector3(0, 1.2, 6), Vector3(0, 1.2, 0))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 11
 
 		11:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-spawn")
-				_capture_or_report("01_spawn_facing_room", Vector3(0, 1.2, 6), Vector3(0, 1.2, 0))
-				phase = 20
+			_debug_cam("before-spawn")
+			_capture_or_report("01_spawn_facing_room", Vector3(0, 1.2, 6), Vector3(0, 1.2, 0))
+			phase = 20
 
 		20:  # View 2: on top of platform, looking back into the room
 			_pose(Vector3(-6, 2.8, -6), Vector3(0, 1.2, 4))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 21
 
 		21:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-platform")
-				_capture_or_report("02_platform_looking_back", Vector3(-6, 2.8, -6), Vector3(0, 1.2, 4))
-				phase = 30
+			_debug_cam("before-platform")
+			_capture_or_report("02_platform_looking_back", Vector3(-6, 2.8, -6), Vector3(0, 1.2, 4))
+			phase = 30
 
 		30:  # View 3: wall-run approach, mid-corridor, derived from wall geometry
 			_pose(Vector3(0, 2.0, 4), Vector3(0, 2.0, -6))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 31
 
 		31:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-wallrun")
-				_capture_or_report("03_wallrun_approach", Vector3(0, 2.0, 4), Vector3(0, 2.0, -6))
-				phase = 40
+			_debug_cam("before-wallrun")
+			_capture_or_report("03_wallrun_approach", Vector3(0, 2.0, 4), Vector3(0, 2.0, -6))
+			phase = 40
 
 		40:  # View 4: worst-case grazing angle, standing in the corridor looking down its length
 			_pose(Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 41
 
 		41:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-corridor")
-				_capture_or_report("04_corridor_down_length", Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
-				phase = 50
+			_debug_cam("before-corridor")
+			_capture_or_report("04_corridor_down_length", Vector3(0, 1.6, 9.0), Vector3(0, 1.6, -9.0))
+			phase = 50
 
 		50:  # View 5: Room 2 straightaway — exit slab receding, pit, slide barrier and entrance slab
 			_pose(Vector3(20, 1.5, -16.0), Vector3(20, 1.8, 6))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 51
 
 		51:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-room2-straightaway")
-				_capture_or_report("05_room2_straightaway", Vector3(20, 1.5, -16.0), Vector3(20, 1.8, 6))
-				phase = 60
+			_debug_cam("before-room2-straightaway")
+			_capture_or_report("05_room2_straightaway", Vector3(20, 1.5, -16.0), Vector3(20, 1.8, 6))
+			phase = 60
 
 		60:  # View 6: Room 2 slide barrier close-up (clearance strip visible)
 			_pose(Vector3(20, 1.5, 12.3), Vector3(20, 1.9, 8))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 61
 
 		61:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-room2-barrier")
-				_capture_or_report("06_room2_barrier", Vector3(20, 1.5, 12.3), Vector3(20, 1.9, 8))
-				phase = 70
+			_debug_cam("before-room2-barrier")
+			_capture_or_report("06_room2_barrier", Vector3(20, 1.5, 12.3), Vector3(20, 1.9, 8))
+			phase = 70
 
 		70:  # View 7: Room 3 wall-run channel, mid platform, gap and finish pad
 			_pose(Vector3(42, 1.6, 1), Vector3(42, 2.0, -8))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 71
 
 		71:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-room3-channel")
-				_capture_or_report("07_room3_channel", Vector3(42, 1.6, 1), Vector3(42, 2.0, -8))
-				phase = 80
+			_debug_cam("before-room3-channel")
+			_capture_or_report("07_room3_channel", Vector3(42, 1.6, 1), Vector3(42, 2.0, -8))
+			phase = 80
 
 		80:  # View 8: Room 3 finish beacon, standing on the finish pad
 			var fin := main_scene.get_node_or_null("TriggerFinish")
 			if fin:
 				fin.set("monitoring", false)
 			_pose(Vector3(42, 4.1, -16.5), Vector3(42, 4.8, -18))
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 81
 
 		81:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-room3-finish")
-				_capture_or_report("08_room3_finish", Vector3(42, 4.1, -16.5), Vector3(42, 5.3, -18))
-				# Re-enable TriggerFinish so the test can re-trigger it later.
-				var fin_re := main_scene.get_node_or_null("TriggerFinish")
-				if fin_re:
-					fin_re.set("monitoring", true)
-				print("[Capture] Phases 01-08 done. Moving to HUD captures...")
-				phase = 90
+			_debug_cam("before-room3-finish")
+			_capture_or_report("08_room3_finish", Vector3(42, 4.1, -16.5), Vector3(42, 5.3, -18))
+			# Re-enable TriggerFinish so the test can re-trigger it later.
+			var fin_re := main_scene.get_node_or_null("TriggerFinish")
+			if fin_re:
+				fin_re.set("monitoring", true)
+			print("[Capture] Phases 01-08 done. Moving to HUD captures...")
+			phase = 90
 
 		90:  # View 9: HUD timer visible during a mid-course run (Room 2, sprint state)
-			# Teleport player to Room 2 mid-corridor and set state=Sprint + grounded so
-			# the RunHUD timer reads > 0 and the debug HUD shows a real state.
-			_pose(Vector3(20, 1.0, -10.0), Vector3(20, 1.2, -16))
+			# Teleport player to Room 2 solid ground on the entrance slab (z=12,
+			# clear of the z<-1 pit) and set a non-idle state so the debug HUD
+			# shows a real state and the RunHUD timer reads > 0.
+			_pose(Vector3(20, 1.0, 12), Vector3(20, 1.2, -16))
 			if player:
 				player.set("state", 4)  # DASH — just for a non-idle HUD read
 			# Seed the RunHUD timer to 37.42 so the capture is deterministic.
@@ -173,17 +163,15 @@ func _process(_delta: float) -> bool:
 			if hud:
 				hud.set("initial_elapsed", 37.42)
 				hud._process(0.0)   # force one tick to apply the seed
-			wait_frames = 0
-			wait_target = 20
+			wait_time = 0.0
+			wait_target = 0.5
 			phase = 91
 
 		91:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-hud-run")
-				_capture_or_report("09_hud_timer_run", Vector3(20, 1.0, -10.0), Vector3(20, 1.2, -16))
-				print("[Capture] Phase 09 done. Moving to results panel...")
-				phase = 100
+			_debug_cam("before-hud-run")
+			_capture_or_report("09_hud_timer_run", Vector3(20, 1.0, 12), Vector3(20, 1.2, -16))
+			print("[Capture] Phase 09 done. Moving to results panel...")
+			phase = 100
 
 		100:  # View 10: Results panel after finishing — place on pad, fire on_finish
 			# Position player on finish pad, freeze, trigger RunHUD + FinishFX.
@@ -203,22 +191,20 @@ func _process(_delta: float) -> bool:
 			var fx := main_scene.get_node_or_null("FinishFX")
 			if fx and fx.has_method("on_finish"):
 				fx.on_finish()
-			wait_frames = 0
-			wait_target = 25
+			wait_time = 0.0
+			wait_target = 0.75
 			phase = 101
 
 		101:
-			wait_frames += 1
-			if wait_frames >= wait_target:
-				_debug_cam("before-results-panel")
-				_capture_or_report("10_results_panel", Vector3(42, 4.1, -16.5), Vector3(42, 4.8, -18))
-				# Re-enable TriggerFinish for normal gameplay
-				var fin3 := main_scene.get_node_or_null("TriggerFinish")
-				if fin3:
-					fin3.set("monitoring", true)
-				print("[Capture] All captures done.")
-				quit()
-				return true
+			_debug_cam("before-results-panel")
+			_capture_or_report("10_results_panel", Vector3(42, 4.1, -16.5), Vector3(42, 4.8, -18))
+			# Re-enable TriggerFinish for normal gameplay
+			var fin3 := main_scene.get_node_or_null("TriggerFinish")
+			if fin3:
+				fin3.set("monitoring", true)
+			print("[Capture] All captures done.")
+			quit()
+			return true
 
 	return false
 
