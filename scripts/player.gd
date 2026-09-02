@@ -1,5 +1,12 @@
 extends CharacterBody3D
 
+## ── Events for feel systems (audio / HUD / camera) ─────────────────
+## Emitted from the existing gameplay hooks without changing any state
+## transition logic. `landed` carries the impact fall velocity so audio
+## and hit-stop can scale to the same threshold the camera dip uses.
+signal landed(impact_velocity: float)
+signal entered_room(room: int)
+
 ## ── State Machine ──────────────────────────────────────────────────
 enum State { GROUND, AIR, WALL_RUN, SLIDE, DASH }
 
@@ -294,6 +301,7 @@ func _do_jump() -> void:
 func _land() -> void:
 	if camera_node and camera_node.has_method("on_land"):
 		camera_node.on_land(velocity.y)
+	landed.emit(velocity.y)
 	coyote_timer = COYOTE_TIME
 	state = State.GROUND
 
@@ -368,6 +376,7 @@ func teleport_to(dest_pos: Vector3, room: int) -> void:
 	dash_velocity = Vector3.ZERO
 	current_room = room
 	state = State.AIR
+	entered_room.emit(room)
 
 
 ## ── Wall Run Helpers ───────────────────────────────────────────────

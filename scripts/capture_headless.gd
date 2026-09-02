@@ -155,6 +155,67 @@ func _process(_delta: float) -> bool:
 			if wait_frames >= wait_target:
 				_debug_cam("before-room3-finish")
 				_capture_or_report("08_room3_finish", Vector3(42, 4.1, -16.5), Vector3(42, 5.3, -18))
+				# Re-enable TriggerFinish so the test can re-trigger it later.
+				var fin_re := main_scene.get_node_or_null("TriggerFinish")
+				if fin_re:
+					fin_re.set("monitoring", true)
+				print("[Capture] Phases 01-08 done. Moving to HUD captures...")
+				phase = 90
+
+		90:  # View 9: HUD timer visible during a mid-course run (Room 2, sprint state)
+			# Teleport player to Room 2 mid-corridor and set state=Sprint + grounded so
+			# the RunHUD timer reads > 0 and the debug HUD shows a real state.
+			_pose(Vector3(20, 1.0, -10.0), Vector3(20, 1.2, -16))
+			if player:
+				player.set("state", 4)  # DASH — just for a non-idle HUD read
+			# Seed the RunHUD timer to 37.42 so the capture is deterministic.
+			var hud := main_scene.get_node_or_null("RunHUD")
+			if hud:
+				hud.set("initial_elapsed", 37.42)
+				hud._process(0.0)   # force one tick to apply the seed
+			wait_frames = 0
+			wait_target = 20
+			phase = 91
+
+		91:
+			wait_frames += 1
+			if wait_frames >= wait_target:
+				_debug_cam("before-hud-run")
+				_capture_or_report("09_hud_timer_run", Vector3(20, 1.0, -10.0), Vector3(20, 1.2, -16))
+				print("[Capture] Phase 09 done. Moving to results panel...")
+				phase = 100
+
+		100:  # View 10: Results panel after finishing — place on pad, fire on_finish
+			# Position player on finish pad, freeze, trigger RunHUD + FinishFX.
+			# Disabling TriggerFinish monitoring so the teleport doesn't race
+			# the capture.
+			var fin2 := main_scene.get_node_or_null("TriggerFinish")
+			if fin2:
+				fin2.set("monitoring", false)
+			_pose(Vector3(42, 4.1, -16.5), Vector3(42, 4.8, -18))
+			if player:
+				player.set("state", 0)
+			var hud2 := main_scene.get_node_or_null("RunHUD")
+			if hud2:
+				hud2.initial_elapsed = 37.42
+				hud2._process(0.0)
+				hud2.on_finish()
+			var fx := main_scene.get_node_or_null("FinishFX")
+			if fx and fx.has_method("on_finish"):
+				fx.on_finish()
+			wait_frames = 0
+			wait_target = 25
+			phase = 101
+
+		101:
+			wait_frames += 1
+			if wait_frames >= wait_target:
+				_debug_cam("before-results-panel")
+				_capture_or_report("10_results_panel", Vector3(42, 4.1, -16.5), Vector3(42, 4.8, -18))
+				# Re-enable TriggerFinish for normal gameplay
+				var fin3 := main_scene.get_node_or_null("TriggerFinish")
+				if fin3:
+					fin3.set("monitoring", true)
 				print("[Capture] All captures done.")
 				quit()
 				return true

@@ -590,13 +590,14 @@ func _build_particles(root: Node3D) -> void:
 	if not player:
 		return
 
-	# 1) Ambient dust motes
+	# 1) Ambient dust motes — parented to Player so feedback_manager + verify_structure
+	# can find it under Player/DustMotes.  Position is local to the Player root.
 	var dust := GPUParticles3D.new()
 	dust.name = "DustMotes"
 	dust.amount = 60
 	dust.lifetime = 6.0
-	dust.position = Vector3(20, 1.5, 0)
-	dust.visibility_aabb = AABB(Vector3(-13, -1, -17), Vector3(66, 9, 34))
+	dust.position = Vector3(0, 1.5, 0)
+	dust.visibility_aabb = AABB(Vector3(-30, -4, -18), Vector3(66, 9, 34))
 	var dust_mat := ParticleProcessMaterial.new()
 	dust_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	dust_mat.emission_box_extents = Vector3(32, 4, 16)
@@ -611,7 +612,7 @@ func _build_particles(root: Node3D) -> void:
 	dust_mat.color_ramp = _make_gradient_tex(_make_fade_ramp())
 	dust.process_material = dust_mat
 	dust.draw_pass_1 = _make_dust_billboard()
-	root.add_child(dust)
+	player.add_child(dust)
 	dust.owner = root.owner
 
 	# 2) Wall-run sparks
@@ -938,13 +939,44 @@ func _build_managers(root: Node3D) -> void:
 	root.add_child(amb)
 	amb.owner = root.owner
 
-	# Feedback manager — wire up particle references
-	# Set meta BEFORE add_child so _ready() can read them
+	# Hitstop — time-scale micro-freeze (Layer 15, same as DebugHUD overlay layer)
+	var hit := Node.new()
+	hit.name = "Hitstop"
+	hit.set_script(load("res://scripts/hitstop.gd"))
+	root.add_child(hit)
+	hit.owner = root.owner
+
+	# Sound manager — baked 3D SFX (player children via player.add_child)
+	var snd := Node.new()
+	snd.name = "SoundManager"
+	snd.set_script(load("res://scripts/sound_manager.gd"))
+	if player:
+		snd.set_meta("player_ref", player)
+	root.add_child(snd)
+	snd.owner = root.owner
+
+	# Run HUD — live timer + results panel
+	var hud := CanvasLayer.new()
+	hud.name = "RunHUD"
+	hud.set_script(load("res://scripts/run_hud.gd"))
+	root.add_child(hud)
+	hud.owner = root.owner
+
+	# Finish FX — vignette/chromatic pulse overlay
+	var fx := CanvasLayer.new()
+	fx.name = "FinishFX"
+	fx.set_script(load("res://scripts/finish_fx.gd"))
+	root.add_child(fx)
+	fx.owner = root.owner
+
+	# Feedback manager — wire up particle + system references
 	var fb := Node.new()
 	fb.name = "FeedbackManager"
 	fb.set_script(load("res://scripts/feedback_manager.gd"))
 	if player:
 		fb.set_meta("player_ref", player)
+		fb.set_meta("sound_ref", snd)
+		fb.set_meta("hitstop_ref", hit)
 		fb.set_meta("dust_motes_ref", player.get_node_or_null("DustMotes"))
 		fb.set_meta("dash_trail_ref", player.get_node_or_null("DashTrail"))
 		fb.set_meta("wall_sparks_ref", player.get_node_or_null("WallSparks"))

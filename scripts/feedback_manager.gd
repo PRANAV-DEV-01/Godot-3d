@@ -1,8 +1,16 @@
 extends Node
 ## Feedback Manager — polls player state, triggers VFX + audio.
 ## Zero changes to movement logic; only reads player.state + velocity.
+##
+## Particle wiring stays exactly as before. All SFX now route to the
+## SoundManager node (3D-spatial baked WAVs). Hit-stop is added on hard
+## landings and dash end via the Hitstop node. Per-event counters let the
+## headless particle/audio test assert that each effect actually fires on
+## its real gameplay event (not just "present in the scene tree").
 
 var player: CharacterBody3D
+var sound: Node
+var hitstop: Node
 
 # Particle refs (set by scene_runtime_builder via meta)
 var dust_motes: GPUParticles3D
@@ -17,21 +25,25 @@ var spark_cd := 0.0
 const WALK_STEP := 0.42
 const SPRINT_STEP := 0.28
 
-# simple synth players
-var sfx_player: AudioStreamPlayer
-
 # Surface detection
 var _last_surface := "concrete"
+
+# Verification counters — incremented at the exact call site that fires the
+# particle, so the test can prove firing, not just presence.
+var hard_landings := 0
+var wall_spark_pulses := 0
+var dash_trail_restarts := 0
+var dust_ledger_frames := 0
 
 
 func _ready() -> void:
 	player = get_node_or_null("/root/Main/Player")
-	sfx_player = AudioStreamPlayer.new()
-	sfx_player.bus = "Master"
-	add_child(sfx_player)
-	# Particle refs wired by scene_runtime_builder via meta
 	if has_meta("player_ref"):
 		player = get_meta("player_ref")
+	if has_meta("sound_ref"):
+		sound = get_meta("sound_ref")
+	if has_meta("hitstop_ref"):
+		hitstop = get_meta("hitstop_ref")
 	if has_meta("dust_motes_ref"):
 		dust_motes = get_meta("dust_motes_ref")
 	if has_meta("dash_trail_ref"):
@@ -42,6 +54,8 @@ func _ready() -> void:
 		landing_puff = get_meta("landing_puff_ref")
 	if has_meta("slide_dust_ref"):
 		slide_dust = get_meta("slide_dust_ref")
+	if player and player.has_signal("landed"):
+		player.landed.connect(_on_player_landed)
 
 
 func _process(delta: float) -> void:
@@ -70,23 +84,51 @@ func _process(delta: float) -> void:
 
 	if dust_motes:
 		dust_motes.emitting = true
+		dust_ledger_frames += 1
 
 
 func _on_transition(old_s: int, new_s: int) -> void:
 	match new_s:
 		0:  # → GROUND
-			if old_s in [1, 4]:
-				_land_fx()
+			# Real landing puffs + severity-scaled sound arrive via the
+			# player.landed signal (carries the true impact velocity).
+			pass
 		1:  # → AIR
-			if old_s == 0:
-				_sfx("jump")
+			if old_s == 0 and sound:
+				sound.on_jump(_last_surface)
 		2:  # → WALL_RUN
-			_sfx("wallrun")
+			if sound:
+				sound.start_wall_run()
 		3:  # → SLIDE
-			_sfx("slide")
+			if sound:
+				sound.start_slide()
 		4:  # → DASH
-			_sfx("dash")
+			if sound:
+				sound.on_dash()
 			_dash_fx()
+
+	# "Leaving a looping state" cues
+	if old_s == 2 and new_s != 2 and sound:
+		sound.stop_wall_run()
+	if old_s == 4 and new_s != 4:
+		if sound:
+			sound.on_dash_end()
+		if hitstop:
+			hitstop.hit(0.05, 2)
+		if new_s == 0:
+			_land_fx()   # dash-charged dust puff on a floor stop
+	if old_s == 3 and new_s != 3 and sound:
+		sound.stop_slide()
+
+
+func _on_player_landed(impact_velocity: float) -> void:
+	_land_fx()
+	if sound:
+		sound.on_land(impact_velocity)
+	if impact_velocity < -8.0:
+		hard_landings += 1
+		if hitstop:
+			hitstop.hit(0.05, 2)
 
 
 func _step_timer(delta: float) -> void:
@@ -101,7 +143,8 @@ func _step_timer(delta: float) -> void:
 	if footstep_cd <= 0.0:
 		footstep_cd = interval
 		_last_surface = _detect_surface()
-		_sfx("step")
+		if sound:
+			sound.on_footstep(spd, _last_surface)
 
 
 func _wall_spark_tick(delta: float) -> void:
@@ -113,7 +156,7 @@ func _wall_spark_tick(delta: float) -> void:
 			if player.wall_run_normal.length_squared() > 0.01:
 				wall_sparks.global_position -= player.wall_run_normal * 0.3
 			wall_sparks.restart()
-		_sfx("wallloop")
+			wall_spark_pulses += 1
 
 
 func _slide_dust_tick() -> void:
@@ -127,13 +170,13 @@ func _land_fx() -> void:
 		landing_puff.global_position = player.global_position + Vector3(0, -0.9, 0)
 		landing_puff.restart()
 	_last_surface = _detect_surface()
-	_sfx("land")
 
 
 func _dash_fx() -> void:
 	if dash_trail and player:
 		dash_trail.global_position = player.global_position
 		dash_trail.restart()
+		dash_trail_restarts += 1
 
 
 # ── Surface Detection ──────────────────────────────────────────────
@@ -151,132 +194,3 @@ func _detect_surface() -> String:
 		if result.collider.has_meta("surface_type"):
 			return result.collider.get_meta("surface_type")
 	return "concrete"
-
-
-# ── Procedural one-shot SFX via AudioStreamGenerator ────────────────
-func _sfx(name: String, vol := 0.0) -> void:
-	var gen := AudioStreamGenerator.new()
-	gen.mix_rate = 22050
-	gen.buffer_length = 0.25
-	sfx_player.stream = gen
-	sfx_player.volume_db = vol
-	sfx_player.play()
-	await get_tree().process_frame
-	var pb = sfx_player.get_stream_playback()
-	if not pb:
-		return
-	match name:
-		"jump":
-			_synth_sweep(pb, 200, 600, 0.08, 0.3)
-		"land":
-			_synth_surface_land(pb)
-		"dash":
-			_synth_sweep(pb, 800, 200, 0.1, 0.35)
-		"slide":
-			_synth_noise(pb, 0.1, 0.25)
-		"wallrun":
-			_synth_sweep(pb, 300, 500, 0.06, 0.2)
-		"wallloop":
-			_synth_noise(pb, 0.04, 0.15)
-		"step":
-			_synth_surface_step(pb)
-
-
-func _synth_sweep(pb, f0: float, f1: float, dur: float, vol: float) -> void:
-	var n := int(dur * 22050)
-	for i in range(min(n, pb.get_frames_available() - 1)):
-		var t := float(i) / 22050.0
-		var frac := float(i) / float(n)
-		var freq := lerpf(f0, f1, frac)
-		var env := 1.0 - frac
-		var s := sin(t * TAU * freq) * vol * env
-		pb.push_frame(Vector2(s, s))
-
-
-func _synth_noise(pb, dur: float, vol: float) -> void:
-	var n := int(dur * 22050)
-	for i in range(min(n, pb.get_frames_available() - 1)):
-		var frac := float(i) / float(n)
-		var env := 1.0 - frac * frac
-		var s := (randf() * 2.0 - 1.0) * vol * env
-		pb.push_frame(Vector2(s, s))
-
-
-# ── Per-Surface Footstep Synth ─────────────────────────────────────
-# Each surface has distinct dur, vol, and tonal character.
-# "concrete": gritty mid-range crunch with slight low-end thump
-# "metal":    sharp bright click with ringing high-frequency tail
-# "wood":     warm hollow thump with soft low-frequency body
-
-func _synth_surface_step(pb) -> void:
-	match _last_surface:
-		"metal":
-			# Bright, sharp click — short noise burst + high sine ping
-			var dur := 0.018
-			var vol := 0.22
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac
-				var noise_part := (randf() * 2.0 - 1.0) * vol * 0.6 * env
-				var t := float(i) / 22050.0
-				var ping := sin(t * TAU * 3200.0) * vol * 0.4 * env * (1.0 - frac)
-				pb.push_frame(Vector2(noise_part + ping, noise_part + ping))
-		"wood":
-			# Warm hollow thump — longer noise + low sine body
-			var dur := 0.05
-			var vol := 0.13
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac * frac
-				var noise_part := (randf() * 2.0 - 1.0) * vol * 0.4 * env
-				var t := float(i) / 22050.0
-				var thump := sin(t * TAU * 90.0) * vol * 0.6 * env * (1.0 - frac * 0.5)
-				pb.push_frame(Vector2(noise_part + thump, noise_part + thump))
-		_:  # "concrete" or unknown — default gritty crunch
-			var dur := 0.03
-			var vol := 0.18
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac * frac
-				var noise_part := (randf() * 2.0 - 1.0) * vol * 0.7 * env
-				var t := float(i) / 22050.0
-				var thump := sin(t * TAU * 150.0) * vol * 0.3 * env * (1.0 - frac)
-				pb.push_frame(Vector2(noise_part + thump, noise_part + thump))
-
-
-func _synth_surface_land(pb) -> void:
-	match _last_surface:
-		"metal":
-			var dur := 0.08
-			var vol := 0.45
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac
-				var noise_part := (randf() * 2.0 - 1.0) * vol * 0.5 * env
-				var t := float(i) / 22050.0
-				var ring := sin(t * TAU * 2400.0) * vol * 0.35 * env * (1.0 - frac * 0.8)
-				pb.push_frame(Vector2(noise_part + ring, noise_part + ring))
-		"wood":
-			var dur := 0.09
-			var vol := 0.38
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac * frac
-				var noise_part := (randf() * 2.0 - 1.0) * vol * 0.35 * env
-				var t := float(i) / 22050.0
-				var thump := sin(t * TAU * 70.0) * vol * 0.65 * env * (1.0 - frac * 0.4)
-				pb.push_frame(Vector2(noise_part + thump, noise_part + thump))
-		_:  # concrete
-			var dur := 0.06
-			var vol := 0.5
-			var n := int(dur * 22050)
-			for i in range(min(n, pb.get_frames_available() - 1)):
-				var frac := float(i) / float(n)
-				var env := 1.0 - frac
-				var s := (randf() * 2.0 - 1.0) * vol * env
-				pb.push_frame(Vector2(s, s))

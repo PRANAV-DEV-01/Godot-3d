@@ -28,6 +28,11 @@ func _on_body_entered(body: Node) -> void:
 	room_entered.emit(body)
 	if is_finish:
 		print("[RoomTrigger] %s: FINISH — run complete, resetting player to Room %d start." % [label, target_room])
+		# Let HUD + finish FX nodes know the run ended (before the teleport
+		# resets the player state; they freeze their timers / play the pulse).
+		for node in get_tree().get_nodes_in_group("finish_listeners"):
+			if node.has_method("on_finish"):
+				node.on_finish()
 	else:
 		print("[RoomTrigger] %s: advancing to Room %d." % [label, target_room])
 	body.call("teleport_to", destination, target_room)
