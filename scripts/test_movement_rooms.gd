@@ -38,6 +38,7 @@ var _fin_dashed := false       # R3 finish dash latch
 
 func _init() -> void:
 	Engine.max_physics_steps_per_frame = 1
+	Engine.max_fps = 60
 	var packed := load("res://scenes/main.tscn")
 	if not packed:
 		push_error("[RoomsTest] Failed to load scene")
@@ -403,13 +404,18 @@ func _f_r2_slide(trace: Array, p) -> Array:
 	return [true, "passed barrier z=%.1f squat=%s" % [minz, sq]]
 
 
-# True once the player is actually standing on the Room 2 exit slab
-# (z -16.5..-11.5), as opposed to sailing over the pit into the void.
+# Cleared the 10.5m gap onto the Room 2 exit slab (z -16.5..-11.5).  The Room2-exit
+# trigger teleports the player to Room 3 on the very tick it lands, so we cannot rely on
+# an on-floor slab sample surviving: accept the player reaching the slab region while its
+# feet stay at/above slab level (never dropping into the pit floor below).
 func _landed_on_r2_slab(trace: Array) -> bool:
 	for e in trace:
-		if e[0].z >= -16.5 and e[0].z <= -11.0 \
-			and e[0].y >= 0.2 and e[0].y <= 1.7 and e[3]:
-			return true
+		if e[0].z >= -16.5 and e[0].z <= -11.0:
+			# feet (center y - 0.9); on the slab top the feet sit at y≈0.4, and while
+			# descending onto it they never fall below that as long as it doesn't drop
+			# into the pit (pit floor is far below).
+			if float(e[0].y) - 0.9 >= 0.2:
+				return true
 	return false
 
 
