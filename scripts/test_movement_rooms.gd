@@ -232,7 +232,15 @@ func _yaw(y: float) -> void:
 
 
 func resolve_refs() -> void:
-	player = main_scene.get_node_or_null("Player") as CharacterBody3D
+	player = null
+	var players := main_scene.get_node_or_null("Players")
+	if players:
+		for c in players.get_children():
+			if c is CharacterBody3D and c.name != "Player_local":
+				player = c as CharacterBody3D
+				break
+		if not player and players.get_child_count() > 0:
+			player = players.get_child(0) as CharacterBody3D
 	if player:
 		cam = player.get_node_or_null("CameraPivot/Camera3D")
 	# Don't let the ScreenshotManager burn time writing files during the run.

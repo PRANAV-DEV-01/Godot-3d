@@ -22,15 +22,32 @@ var initial_elapsed := 0.0
 var _timer_label: Label
 var _panel: PanelContainer
 var _result_time: Label
+var _opponent_label: Label
 
 
 func _ready() -> void:
 	layer = 20
-	player = get_node_or_null("/root/Main/Player")
+	# Find local player — may not exist yet when this HUD is built.
+	player = _find_local_player()
 	add_to_group("finish_listeners")
 	_build()
 	if initial_elapsed > 0.0:
 		_elapsed = initial_elapsed
+	# Phase 5: show a notice when the remote racer finishes.
+	var nm := get_tree().root.get_node_or_null("NetworkManager") as Node
+	if nm:
+		nm.connect("finish_reported", _on_opponent_finished)
+
+
+func _find_local_player():
+	var root_player = get_node_or_null("/root/Main/Players")
+	if root_player:
+		for c in root_player.get_children():
+			if c is CharacterBody3D and c.is_multiplayer_authority():
+				return c
+		if root_player.get_child_count() > 0:
+			return root_player.get_child(0)
+	return null
 
 
 func _build() -> void:
@@ -79,6 +96,27 @@ func _build() -> void:
 	prompt.add_theme_font_size_override("font_size", 24)
 	prompt.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9, 0.95))
 	vb.add_child(prompt)
+
+	_opponent_label = Label.new()
+	_opponent_label.name = "OpponentFinish"
+	_opponent_label.text = ""
+	_opponent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_opponent_label.add_theme_font_size_override("font_size", 26)
+	_opponent_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.5))
+	_opponent_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_opponent_label.offset_top = 74.0
+	_opponent_label.offset_bottom = 110.0
+	_opponent_label.offset_left = -300.0
+	_opponent_label.offset_right = 300.0
+	_opponent_label.visible = false
+	add_child(_opponent_label)
+
+
+func _on_opponent_finished(finisher_id: int) -> void:
+	if _opponent_label:
+		var who := "Host" if finisher_id == 1 else "Player %d" % finisher_id
+		_opponent_label.text = "%s finished the race!" % who
+		_opponent_label.visible = true
 
 
 func _process(delta: float) -> void:

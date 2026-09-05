@@ -75,6 +75,42 @@ func _ready() -> void:
 	add_to_group("player")
 
 
+## ── Multiplayer setup (called by Main after spawn) ──────────────
+func setup_multiplayer_authority() -> void:
+	if not multiplayer.has_multiplayer_peer():
+		# Solo mode — no networking at all.
+		return
+	# Every replica needs a Sync node at the same path so replicated state
+	# has a destination on the receiving peer (and a sender on the authority).
+	# Only the player's authority configures/sends; other peers still receive.
+	var sync: MultiplayerSynchronizer = get_node_or_null("Sync")
+	if not sync:
+		sync = MultiplayerSynchronizer.new()
+		sync.name = "Sync"
+		sync.set_multiplayer_authority(get_multiplayer_authority())
+		sync.replication_config = SceneReplicationConfig.new()
+		for p in ["position", "rotation", "state", "current_room"]:
+			# Property paths resolve as subnames on the node at root_path ("./..").
+			sync.replication_config.add_property(NodePath(":%s" % p))
+		add_child(sync)
+	var auth := is_multiplayer_authority()
+	if not auth:
+		# Remote player — freeze physics and disable local controls/camera.
+		set_physics_process(false)
+		camera.current = false
+		camera.set_process(false)
+		camera.set_process_unhandled_input(false)
+		collision_shape.disabled = true
+		wall_left.enabled = false
+		wall_right.enabled = false
+		ceiling_check.enabled = false
+		return
+	# Local player — keep camera live; the synchronizer above replicates us.
+	camera.current = true
+	camera.set_process(true)
+	camera.set_process_unhandled_input(true)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_ESCAPE:

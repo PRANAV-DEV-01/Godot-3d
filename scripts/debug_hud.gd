@@ -1,11 +1,23 @@
 extends CanvasLayer
 
 @onready var label: Label = $Label
-@onready var player: CharacterBody3D = get_node("/root/Main/Player")
+var player: CharacterBody3D
 
 
 func _process(_delta: float) -> void:
-	if not player or not label:
+	if not label:
+		return
+	if not player:
+		# Find local player — spawned after this HUD is built.
+		var players := get_node_or_null("/root/Main/Players")
+		if players:
+			for c in players.get_children():
+				if c is CharacterBody3D and c.is_multiplayer_authority():
+					player = c
+					break
+			if not player and players.get_child_count() > 0:
+				player = players.get_child(0) as CharacterBody3D
+	if not player:
 		return
 
 	var state_name: String = player.get_state_name()

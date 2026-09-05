@@ -586,7 +586,7 @@ func _add_omni(parent: Node3D, pos: Vector3, range_: float,
 # ══════════════════════════════════════════════════════════════════════
 
 func _build_particles(root: Node3D) -> void:
-	var player := root.get_node_or_null("Player")
+	var player := _find_player(root)
 	if not player:
 		return
 
@@ -930,7 +930,8 @@ func _rebuild_env(root: Node3D) -> void:
 # ══════════════════════════════════════════════════════════════════════
 
 func _build_managers(root: Node3D) -> void:
-	var player = root.get_node_or_null("Player")
+	# Find the local player — may not exist yet in multiplayer (spawned later).
+	var player = _find_player(root)
 
 	# Ambient audio
 	var amb := Node.new()
@@ -991,3 +992,17 @@ func _build_managers(root: Node3D) -> void:
 	ss.set_script(load("res://scripts/screenshot_manager.gd"))
 	root.add_child(ss)
 	ss.owner = root.owner
+
+
+## Find a local, player-controlled instance anywhere under Players/ (or a lone
+## solo player).  Returns null if none exists yet (multiplayer spawn is delayed).
+func _find_player(root: Node3D) -> Node3D:
+	var players := root.get_node_or_null("Players")
+	if players:
+		for c in players.get_children():
+			if c is CharacterBody3D and c.is_multiplayer_authority():
+				return c as Node3D
+		# Fall back to the first player if authority is 0/unknown.
+		if players.get_child_count() > 0:
+			return players.get_child(0) as Node3D
+	return null

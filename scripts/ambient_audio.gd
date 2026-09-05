@@ -32,7 +32,7 @@ func _ready() -> void:
 	if has_meta("player_ref"):
 		player = get_meta("player_ref")
 	else:
-		player = get_node_or_null("/root/Main/Player")
+		player = _find_local_player()
 
 	var bands: Array = [
 		# [name, [(freq, amp), ...], noise_amp]
@@ -47,22 +47,31 @@ func _ready() -> void:
 		var wav := _bake_loop(bands[i][1], float(bands[i][2]), bands[i][0])
 		_verify_seam(wav, bands[i][0])
 
-		var p := AudioStreamPlayer3D.new()
-		p.name = "Ambient_" + bands[i][0]
-		p.stream = wav
-		p.position = centers[i]
-		p.volume_db = -60.0
-		p.max_distance = 60.0
-		p.unit_size = 24.0
-		p.max_db = 4.0
-		add_child(p)
-		p.play()
-		_rooms.append(p)
+		var ap := AudioStreamPlayer3D.new()
+		ap.name = "Ambient_" + bands[i][0]
+		ap.stream = wav
+		ap.position = centers[i]
+		ap.volume_db = -60.0
+		ap.max_distance = 60.0
+		ap.unit_size = 24.0
+		ap.max_db = 4.0
+		add_child(ap)
+		ap.play()
+		_rooms.append(ap)
 		_room_vol[i] = -60.0
 
 	_started = true
 	print("[Ambient] 3 room drones baked + playing (Room 1 active, others crossfading).")
 	_update_room(1, true)
+
+
+func _find_local_player() -> CharacterBody3D:
+	var p := get_node_or_null("/root/Main/Players")
+	if p:
+		for c in p.get_children():
+			if c is CharacterBody3D:
+				return c
+	return null
 
 
 func _process(delta: float) -> void:

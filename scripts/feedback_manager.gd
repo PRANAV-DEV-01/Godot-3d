@@ -37,9 +37,10 @@ var dust_ledger_frames := 0
 
 
 func _ready() -> void:
-	player = get_node_or_null("/root/Main/Player")
 	if has_meta("player_ref"):
 		player = get_meta("player_ref")
+	else:
+		player = _find_local_player()
 	if has_meta("sound_ref"):
 		sound = get_meta("sound_ref")
 	if has_meta("hitstop_ref"):
@@ -56,6 +57,15 @@ func _ready() -> void:
 		slide_dust = get_meta("slide_dust_ref")
 	if player and player.has_signal("landed"):
 		player.landed.connect(_on_player_landed)
+
+
+func _find_local_player():
+	var p := get_node_or_null("/root/Main/Players")
+	if p:
+		for c in p.get_children():
+			if c is CharacterBody3D:
+				return c
+	return null
 
 
 func _process(delta: float) -> void:

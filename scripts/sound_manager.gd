@@ -32,12 +32,21 @@ func _ready() -> void:
 	if has_meta("player_ref"):
 		player = get_meta("player_ref")
 	else:
-		player = get_node_or_null("/root/Main/Player")
+		player = _find_local_player()
 
 	_bake_all()
 	_build_players()
 	add_to_group("finish_listeners")
 	print("[Sound] %d SFX baked; %d one-shot players + 2 loop players (3D, mounted on Player)." % [_streams.size(), ONESHOT_POOL])
+
+
+func _find_local_player() -> CharacterBody3D:
+	var p := get_node_or_null("/root/Main/Players")
+	if p:
+		for c in p.get_children():
+			if c is CharacterBody3D:
+				return c
+	return null
 
 
 # ── Public event API (called by FeedbackManager / room triggers) ──────
