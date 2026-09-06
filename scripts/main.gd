@@ -47,6 +47,7 @@ func _spawn_local_player() -> void:
 	var inst := scene.instantiate()
 	inst.name = "Player_local"
 	inst.set_multiplayer_authority(1)
+	inst.position = Vector3(0, 1, 6)
 	players.add_child(inst)
 	inst.setup_multiplayer_authority()
 

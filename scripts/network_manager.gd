@@ -83,6 +83,7 @@ func _spawn_on_main(peer_id: int) -> void:
 	var inst := scene.instantiate()
 	inst.name = name_
 	inst.set_multiplayer_authority(peer_id)
+	inst.position = Vector3(0, 1, 6)
 	players.add_child(inst)
 
 

@@ -77,8 +77,17 @@ func _ready() -> void:
 
 ## ── Multiplayer setup (called by Main after spawn) ──────────────
 func setup_multiplayer_authority() -> void:
-	if not multiplayer.has_multiplayer_peer():
-		# Solo mode — no networking at all.
+	# Solo mode must NEVER touch the authority/freeze path. Note that
+	# `multiplayer.has_multiplayer_peer()` reports TRUE even when no peer is
+	# configured (Godot 4 ships a default offline peer), so depend on the
+	# NetworkManager autoload instead: it only reaches us after a lobby
+	# Host/Join, otherwise we force everything live and bail.
+	var nm: Node = get_tree().root.get_node_or_null("NetworkManager")
+	if nm == null or not (nm.is_online() or nm.is_host()):
+		# Solo — keep physics, camera and input unconditionally live.
+		camera.current = true
+		camera.set_process(true)
+		camera.set_process_unhandled_input(true)
 		return
 	# Every replica needs a Sync node at the same path so replicated state
 	# has a destination on the receiving peer (and a sender on the authority).

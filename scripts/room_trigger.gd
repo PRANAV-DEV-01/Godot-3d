@@ -36,10 +36,10 @@ func _on_body_entered(body: Node) -> void:
 		# Phase 5: tell the remote racer this (local) player finished.
 		# Remote replicas are frozen with collision disabled, so a finish here
 		# can only come from this peer's own player.
-		if get_tree().has_multiplayer_peer() and body.is_multiplayer_authority() \
+		if body.has_method("is_multiplayer_authority") and body.is_multiplayer_authority() \
 				and body.get_multiplayer_authority() == multiplayer.get_unique_id():
-			var nm := get_tree().root.get_node_or_null("NetworkManager") as Node
-			if nm and nm.has_method("rpc"):
+			var nm: Node = get_tree().root.get_node_or_null("NetworkManager")
+			if nm != null and nm.is_online() and nm.has_method("rpc"):
 				nm.rpc("announce_finish", multiplayer.get_unique_id())
 	else:
 		print("[RoomTrigger] %s: advancing to Room %d." % [label, target_room])
